@@ -18,6 +18,8 @@ func (l *Lexer) NextToken() token.Token {
 		return newToken(token.EOF, 0)
 	}
 
+	l.eatWhiteSpace() // whitespaces are just token separators for us
+
 	ch := l.input[l.pos]
 
 	var tok token.Token
@@ -37,8 +39,20 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.RBRACE, ch)
 	case ';':
 		tok = newToken(token.SEMICOLON, ch)
+	case ',':
+		tok = newToken(token.COMMA, ch)
 	default:
-		tok = newToken(token.ILLEGAL, ch)
+		if isLetter(ch) {
+			tok.Literal = l.readIdent()
+			tok.Type = token.GetTokenFromName(tok.Literal)
+			return tok
+		} else if isDigit(ch) {
+			tok.Literal = l.readNumber()
+			tok.Type = token.INT
+			return tok
+		} else {
+			tok = newToken(token.ILLEGAL, ch)
+		}
 	}
 
 	l.pos++
@@ -48,4 +62,45 @@ func (l *Lexer) NextToken() token.Token {
 
 func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}
+}
+
+// isLetter defines the allowed characters in the language identifiers.
+func isLetter(ch byte) bool {
+	if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch == '_') {
+		return true
+	}
+	return false
+}
+
+func isDigit(ch byte) bool {
+	return ch >= '0' && ch <= '9'
+}
+
+func (l *Lexer) readIdent() string {
+	startingPos := l.pos
+	for isLetter(l.input[l.pos]) {
+		l.pos++
+	}
+	return l.input[startingPos:l.pos]
+}
+
+func (l *Lexer) readNumber() string {
+	startingPos := l.pos
+	for isDigit(l.input[l.pos]) {
+		l.pos++
+	}
+	return l.input[startingPos:l.pos]
+}
+
+func (l *Lexer) eatWhiteSpace() {
+	for isWhiteSpace(l.input[l.pos]) {
+		l.pos++
+	}
+}
+
+func isWhiteSpace(ch byte) bool {
+	if (ch == ' ') || (ch == '\t') || (ch == '\n') || (ch == '\r') {
+		return true
+	}
+	return false
 }

@@ -24,3 +24,15 @@ type Token struct {
 	Type    TokenType
 	Literal string
 }
+
+var keywords = map[string]TokenType{
+	"let": LET,
+	"fn":  FUNCTION,
+}
+
+func GetTokenFromName(name string) TokenType {
+	if token, ok := keywords[name]; ok {
+		return token
+	}
+	return IDENT
+}
