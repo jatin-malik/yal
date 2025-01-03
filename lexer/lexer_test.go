@@ -47,7 +47,16 @@ func TestLexer(t *testing.T) {
 			let add = fn(x,y){
 				x+y;
 			}
-			let result = add(five,ten);`
+			let result = add(five,ten);
+			-/*!<>50
+			
+			if (5<10){
+				return true
+			}else{
+				return false
+			}
+			5==5
+			5!=10`
 
 		l := lexer.New(input)
 
@@ -90,6 +99,35 @@ func TestLexer(t *testing.T) {
 			{token.IDENT, "ten"},
 			{token.RPAREN, ")"},
 			{token.SEMICOLON, ";"},
+			{token.MINUS, "-"},
+			{token.SLASH, "/"},
+			{token.ASTERISK, "*"},
+			{token.BANG, "!"},
+			{token.LT, "<"},
+			{token.GT, ">"},
+			{token.INT, "50"},
+
+			{token.IF, "if"},
+			{token.LPAREN, "("},
+			{token.INT, "5"},
+			{token.LT, "<"},
+			{token.INT, "10"},
+			{token.RPAREN, ")"},
+			{token.LBRACE, "{"},
+			{token.RETURN, "return"},
+			{token.TRUE, "true"},
+			{token.RBRACE, "}"},
+			{token.ELSE, "else"},
+			{token.LBRACE, "{"},
+			{token.RETURN, "return"},
+			{token.FALSE, "false"},
+			{token.RBRACE, "}"},
+			{token.INT, "5"},
+			{token.EQ, "=="},
+			{token.INT, "5"},
+			{token.INT, "5"},
+			{token.NEQ, "!="},
+			{token.INT, "10"},
 			{token.EOF, string(byte(0))},
 		}
 

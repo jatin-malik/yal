@@ -3,19 +3,38 @@ package token
 type TokenType string
 
 const (
-	LET       TokenType = "LET"
-	IDENT     TokenType = "IDENT"
+	// Single char tokens
 	ASSIGN    TokenType = "="
-	INT       TokenType = "INT"
 	SEMICOLON TokenType = ";"
 	COMMA     TokenType = ","
 	PLUS      TokenType = "+"
+	MINUS     TokenType = "-"
+	SLASH     TokenType = "/"
+	ASTERISK  TokenType = "*"
+	BANG      TokenType = "!"
+	LT        TokenType = "<"
+	GT        TokenType = ">"
 	LPAREN    TokenType = "("
 	RPAREN    TokenType = ")"
 	LBRACE    TokenType = "{"
 	RBRACE    TokenType = "}"
-	FUNCTION  TokenType = "FUNCTION"
 
+	// Double char tokens
+	EQ  TokenType = "=="
+	NEQ TokenType = "!="
+
+	// Keywords
+	LET      TokenType = "LET"
+	INT      TokenType = "INT"
+	FUNCTION TokenType = "FUNCTION"
+	IF       TokenType = "IF"
+	ELSE     TokenType = "ELSE"
+	RETURN   TokenType = "RETURN"
+	TRUE     TokenType = "TRUE"
+	FALSE    TokenType = "FALSE"
+
+	// Others
+	IDENT   TokenType = "IDENT"
 	ILLEGAL TokenType = "ILLEGAL"
 	EOF     TokenType = "EOF"
 )
@@ -26,8 +45,13 @@ type Token struct {
 }
 
 var keywords = map[string]TokenType{
-	"let": LET,
-	"fn":  FUNCTION,
+	"let":    LET,
+	"fn":     FUNCTION,
+	"if":     IF,
+	"else":   ELSE,
+	"return": RETURN,
+	"true":   TRUE,
+	"false":  FALSE,
 }
 
 func GetTokenFromName(name string) TokenType {

@@ -27,8 +27,34 @@ func (l *Lexer) NextToken() token.Token {
 	switch ch {
 	case '+':
 		tok = newToken(token.PLUS, ch)
+	case '-':
+		tok = newToken(token.MINUS, ch)
+	case '/':
+		tok = newToken(token.SLASH, ch)
+	case '*':
+		tok = newToken(token.ASTERISK, ch)
+	case '!':
+		nextCh := l.peekNextChar()
+		if nextCh == '=' {
+			l.pos++
+			tok.Type = token.NEQ
+			tok.Literal = "!="
+		} else {
+			tok = newToken(token.BANG, ch)
+		}
+	case '<':
+		tok = newToken(token.LT, ch)
+	case '>':
+		tok = newToken(token.GT, ch)
 	case '=':
-		tok = newToken(token.ASSIGN, ch)
+		nextCh := l.peekNextChar()
+		if nextCh == '=' {
+			l.pos++
+			tok.Type = token.EQ
+			tok.Literal = "=="
+		} else {
+			tok = newToken(token.ASSIGN, ch)
+		}
 	case '(':
 		tok = newToken(token.LPAREN, ch)
 	case ')':
@@ -78,7 +104,7 @@ func isDigit(ch byte) bool {
 
 func (l *Lexer) readIdent() string {
 	startingPos := l.pos
-	for isLetter(l.input[l.pos]) {
+	for l.pos < len(l.input) && isLetter(l.input[l.pos]) {
 		l.pos++
 	}
 	return l.input[startingPos:l.pos]
@@ -86,7 +112,7 @@ func (l *Lexer) readIdent() string {
 
 func (l *Lexer) readNumber() string {
 	startingPos := l.pos
-	for isDigit(l.input[l.pos]) {
+	for l.pos < len(l.input) && isDigit(l.input[l.pos]) {
 		l.pos++
 	}
 	return l.input[startingPos:l.pos]
@@ -103,4 +129,12 @@ func isWhiteSpace(ch byte) bool {
 		return true
 	}
 	return false
+}
+
+func (l *Lexer) peekNextChar() byte {
+	lookupIdx := l.pos + 1
+	if lookupIdx >= len(l.input) {
+		return 0
+	}
+	return l.input[lookupIdx]
 }
