@@ -112,6 +112,8 @@ func TestExpressionParsing(t *testing.T) {
 		// Unary Operators
 		{"-5", "( -5 )"},
 		{"- (3 + 2)", "( -( 3 + 2 ) )"},
+		{"!true", "( !true )"},
+		{"!false", "( !false )"},
 
 		// Comparison Operators
 		{"5 == 2", "( 5 == 2 )"},

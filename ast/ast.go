@@ -97,6 +97,20 @@ func (il IntegerLiteral) TokenLiteral() string {
 	return il.Token.Literal
 }
 
+type BooleanLiteral struct {
+	Token token.Token
+	Value bool
+}
+
+func (bl BooleanLiteral) expressionBehaviour() {}
+func (bl BooleanLiteral) String() string {
+	return bl.Token.Literal
+}
+
+func (bl BooleanLiteral) TokenLiteral() string {
+	return bl.Token.Literal
+}
+
 type PrefixExpression struct {
 	Token token.Token
 	Right Expression
