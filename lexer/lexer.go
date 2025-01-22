@@ -14,11 +14,11 @@ func New(input string) *Lexer {
 }
 
 func (l *Lexer) NextToken() token.Token {
+	l.eatWhiteSpace() // whitespaces are just token separators for us
+
 	if l.pos >= len(l.input) {
 		return newToken(token.EOF, 0)
 	}
-
-	l.eatWhiteSpace() // whitespaces are just token separators for us
 
 	ch := l.input[l.pos]
 
@@ -119,7 +119,7 @@ func (l *Lexer) readNumber() string {
 }
 
 func (l *Lexer) eatWhiteSpace() {
-	for isWhiteSpace(l.input[l.pos]) {
+	for l.pos < len(l.input) && isWhiteSpace(l.input[l.pos]) {
 		l.pos++
 	}
 }

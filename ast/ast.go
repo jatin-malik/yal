@@ -59,6 +59,24 @@ func (returnStmt ReturnStatement) String() string {
 func (returnStmt ReturnStatement) statementBehaviour() {
 }
 
+type ExpressionStatement struct {
+	Token token.Token
+	Expr  Expression
+}
+
+func (expStmt *ExpressionStatement) TokenLiteral() string {
+	return expStmt.Token.Literal
+}
+
+func (expStmt *ExpressionStatement) String() string {
+	if expStmt.Expr == nil {
+		return ""
+	}
+	return expStmt.Expr.String()
+}
+
+func (expStmt *ExpressionStatement) statementBehaviour() {}
+
 // Expression represents a generic expression in the program.
 type Expression interface {
 	Node                  // An expression is a node in the AST.
@@ -77,6 +95,50 @@ func (il IntegerLiteral) String() string {
 
 func (il IntegerLiteral) TokenLiteral() string {
 	return il.Token.Literal
+}
+
+type PrefixExpression struct {
+	Token token.Token
+	Right Expression
+}
+
+func (pe PrefixExpression) expressionBehaviour() {}
+
+func (pe PrefixExpression) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("( ")
+	buf.WriteString(pe.TokenLiteral())
+	buf.WriteString(pe.Right.String())
+	buf.WriteString(" )")
+	return buf.String()
+}
+
+func (pe PrefixExpression) TokenLiteral() string {
+	return pe.Token.Literal
+}
+
+type InfixExpression struct {
+	Token    token.Token
+	Left     Expression
+	Operator string
+	Right    Expression
+}
+
+func (ie InfixExpression) expressionBehaviour() {}
+func (ie InfixExpression) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("( ")
+	buf.WriteString(ie.Left.String())
+	buf.WriteString(" ")
+	buf.WriteString(ie.Operator)
+	buf.WriteString(" ")
+	buf.WriteString(ie.Right.String())
+	buf.WriteString(" )")
+	return buf.String()
+}
+
+func (ie InfixExpression) TokenLiteral() string {
+	return ie.Token.Literal
 }
 
 type Identifier struct {
