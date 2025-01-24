@@ -111,6 +111,34 @@ func (bl BooleanLiteral) TokenLiteral() string {
 	return bl.Token.Literal
 }
 
+type FunctionLiteral struct {
+	Token      token.Token
+	Parameters []*Identifier
+	Body       *BlockStatement
+}
+
+func (fl FunctionLiteral) expressionBehaviour() {}
+
+func (fl FunctionLiteral) String() string {
+	var buf bytes.Buffer
+	buf.WriteString(fl.TokenLiteral() + " ")
+	buf.WriteString("(")
+	for i, parameter := range fl.Parameters {
+		if i > 0 {
+			buf.WriteString(", ")
+
+		}
+		buf.WriteString(parameter.Value)
+	}
+	buf.WriteString(") ")
+	buf.WriteString(fl.Body.String())
+	return buf.String()
+}
+
+func (fl FunctionLiteral) TokenLiteral() string {
+	return fl.Token.Literal
+}
+
 type PrefixExpression struct {
 	Token token.Token
 	Right Expression
@@ -193,3 +221,25 @@ func (prg Program) String() string {
 
 	return buf.String()
 }
+
+type BlockStatement struct {
+	Token      token.Token
+	Statements []Statement
+}
+
+func (bs BlockStatement) TokenLiteral() string {
+	return bs.Token.Literal
+}
+
+func (bs BlockStatement) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("{ ")
+	for _, stmt := range bs.Statements {
+		buf.WriteString(stmt.String() + " ")
+	}
+	buf.WriteString("}")
+	return buf.String()
+}
+
+// TODO: Is this a statement or an expression ?
+func (bs BlockStatement) statementBehaviour() {}

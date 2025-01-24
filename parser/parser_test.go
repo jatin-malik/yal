@@ -164,6 +164,64 @@ func TestExpressionParsing(t *testing.T) {
 
 }
 
+func TestFunctionLiteralParsing(t *testing.T) {
+	tests := []struct {
+		input                    string
+		expectedExpressionString string
+	}{
+
+		// Simple function with parameters and a return statement
+		{"fn (x,y) { return x+y;}", "fn (x, y) { return ( x + y ); }"},
+
+		// Function with a simple arithmetic operation
+		{"fn (x) { return x * 2; }", "fn (x) { return ( x * 2 ); }"},
+
+		// Function with a complex expression
+		{"fn (x, y) { return x*y + y - x; }",
+			"fn (x, y) { return ( ( ( x * y ) + y ) - x ); }"},
+
+		// Function with a variable assignment
+		{"fn (x) { let result = x * 2; return result; }",
+			"fn (x) { let result = ( x * 2 ); return result; }"},
+
+		// Function with multiple expressions
+		{"fn (x, y) { return x + y * 2 - x; }",
+			"fn (x, y) { return ( ( x + ( y * 2 ) ) - x ); }"},
+
+		// Function that returns a constant value
+		{"fn () { return 42; }", "fn () { return 42; }"},
+
+		// Function with a variable defined inside
+		{"fn (x) { let y = x + 10; return y; }",
+			"fn (x) { let y = ( x + 10 ); return y; }"},
+
+		// Simple function with an operation and return
+		{"fn (x) { return x - 3; }", "fn (x) { return ( x - 3 ); }"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		parser := New(l)
+
+		program := parser.ParseProgram()
+
+		checkParserErrors(parser, t, tt.input)
+
+		if len(program.Statements) != 1 {
+			t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
+		}
+
+		if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
+			t.Error("expected an expression statement")
+		} else {
+			if stmt.String() != tt.expectedExpressionString {
+				t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+			}
+		}
+	}
+
+}
+
 func checkParserErrors(parser *Parser, t *testing.T, input string) {
 	if len(parser.errors) != 0 {
 		t.Logf("failed for input %s", input)

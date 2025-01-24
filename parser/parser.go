@@ -37,6 +37,7 @@ func New(lexer *lexer.Lexer) *Parser {
 	parser.registerPrefix(token.LPAREN, parser.parseGroupedExpression)
 	parser.registerPrefix(token.TRUE, parser.parseBooleanLiteral)
 	parser.registerPrefix(token.FALSE, parser.parseBooleanLiteral)
+	parser.registerPrefix(token.FUNCTION, parser.parseFunctionLiteral)
 
 	// Infix parsers
 	parser.registerInfix(token.PLUS, parser.parseInfixExpression)
@@ -168,6 +169,65 @@ func (p *Parser) parseBooleanLiteral() ast.Expression {
 	exp := &ast.BooleanLiteral{Token: p.curToken}
 	exp.Value = p.curToken.Literal == "true"
 	return exp
+}
+
+func (p *Parser) parseFunctionLiteral() ast.Expression {
+	exp := &ast.FunctionLiteral{
+		Token: p.curToken,
+	}
+
+	p.Next()
+	exp.Parameters = p.parseFunctionParams()
+	p.Next()
+	exp.Body = p.parseFunctionBody()
+	return exp
+}
+
+func (p *Parser) parseFunctionParams() []*ast.Identifier {
+	if p.curToken.Type != token.LPAREN {
+		return nil
+	}
+
+	p.Next()
+	var identifiers []*ast.Identifier
+	for p.curToken.Type != token.RPAREN {
+		ident := &ast.Identifier{
+			Token: p.curToken,
+			Value: p.curToken.Literal,
+		}
+		identifiers = append(identifiers, ident)
+		p.Next()
+		if p.curToken.Type == token.COMMA {
+			p.Next()
+		}
+	}
+	return identifiers
+}
+
+func (p *Parser) parseFunctionBody() *ast.BlockStatement {
+	if p.curToken.Type != token.LBRACE {
+		return nil
+	}
+	p.Next()
+	program := &ast.BlockStatement{
+		Token: p.curToken,
+	}
+	var statements []ast.Statement
+
+	for p.curToken.Type != token.EOF && p.curToken.Type != token.RBRACE {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			statements = append(statements, *stmt)
+		}
+		p.Next()
+	}
+
+	if p.curToken.Type != token.RBRACE {
+		return nil
+	}
+
+	program.Statements = statements
+	return program
 }
 
 func (p *Parser) parseExpression(precedence int) ast.Expression {
