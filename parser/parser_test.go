@@ -191,12 +191,83 @@ func TestFunctionLiteralParsing(t *testing.T) {
 		// Function that returns a constant value
 		{"fn () { return 42; }", "fn () { return 42; }"},
 
-		// Function with a variable defined inside
-		{"fn (x) { let y = x + 10; return y; }",
-			"fn (x) { let y = ( x + 10 ); return y; }"},
+		// Function with a variable defined inside and optional return
+		{"fn (x) { let y = x + 10; y; }",
+			"fn (x) { let y = ( x + 10 ); y }"},
 
 		// Simple function with an operation and return
 		{"fn (x) { return x - 3; }", "fn (x) { return ( x - 3 ); }"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		parser := New(l)
+
+		program := parser.ParseProgram()
+
+		checkParserErrors(parser, t, tt.input)
+
+		if len(program.Statements) != 1 {
+			t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
+		}
+
+		if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
+			t.Error("expected an expression statement")
+		} else {
+			if stmt.String() != tt.expectedExpressionString {
+				t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+			}
+		}
+	}
+
+}
+
+func TestIfElseConditionalParsing(t *testing.T) {
+	tests := []struct {
+		input                    string
+		expectedExpressionString string
+	}{
+		// ================================
+		// Regular if-else with expressions
+		// ================================
+		{"if (x > y) { let z = x; } else { let z = y; }",
+			"if ( x > y ){ let z = x; } else { let z = y; }"},
+
+		{"if (x > y) { let x = 10; } else { let y = 10; }",
+			"if ( x > y ){ let x = 10; } else { let y = 10; }"},
+
+		{"if (x > y) { if (y > 0) { let z = 5; } else { let z = 10; } } else { let z = 0; }",
+			"if ( x > y ){ if ( y > 0 ){ let z = 5; } else { let z = 10; } } else { let z = 0; }"},
+
+		{"if (x > y) { let x = x + 1; let y = y + 1; } else { let x = x - 1; let y = y - 1; }",
+			"if ( x > y ){ let x = ( x + 1 ); let y = ( y + 1 ); } else { let x = ( x - 1 ); let y = ( y - 1 ); }"},
+
+		// ================================
+		// Edge cases: Missing else block
+		// ================================
+		{"if (x > y) { let z = x; }",
+			"if ( x > y ){ let z = x; }"},
+
+		{"if (x > y) { }",
+			"if ( x > y ){ }"},
+
+		{"if (x > y) { let z = x + y; }",
+			"if ( x > y ){ let z = ( x + y ); }"},
+
+		// ================================
+		// Only if block with return statement
+		// ================================
+		{"if (x > y) { return true; }",
+			"if ( x > y ){ return true; }"},
+
+		// ================================
+		// Complex conditions and operations
+		// ================================
+		{"if (x * 2 > y + 10) { let z = x; } else { let z = y; }",
+			"if ( ( x * 2 ) > ( y + 10 ) ){ let z = x; } else { let z = y; }"},
+
+		{"if (x + 10 > y) { let z = x * 2; }",
+			"if ( ( x + 10 ) > y ){ let z = ( x * 2 ); }"},
 	}
 
 	for _, tt := range tests {

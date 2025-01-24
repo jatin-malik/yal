@@ -135,6 +135,34 @@ func (fl FunctionLiteral) String() string {
 	return buf.String()
 }
 
+type IfElseConditional struct {
+	Token       token.Token
+	Condition   Expression
+	Consequence *BlockStatement
+	Alternative *BlockStatement
+}
+
+func (iec IfElseConditional) expressionBehaviour() {}
+
+func (iec IfElseConditional) String() string {
+	var buf bytes.Buffer
+	buf.WriteString(iec.TokenLiteral() + " ")
+	buf.WriteString(iec.Condition.String())
+	if iec.Consequence != nil {
+		buf.WriteString(iec.Consequence.String())
+
+	}
+	if iec.Alternative != nil {
+		buf.WriteString(" else ")
+		buf.WriteString(iec.Alternative.String())
+	}
+	return buf.String()
+}
+
+func (iec IfElseConditional) TokenLiteral() string {
+	return iec.Token.Literal
+}
+
 func (fl FunctionLiteral) TokenLiteral() string {
 	return fl.Token.Literal
 }
