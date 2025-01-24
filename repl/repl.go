@@ -3,23 +3,28 @@ package repl
 
 import (
 	"bufio"
-	"fmt"
+	"github.com/jatin-malik/make-thy-interpreter/parser"
 	"io"
 	"strings"
 
 	"github.com/jatin-malik/make-thy-interpreter/lexer"
-	"github.com/jatin-malik/make-thy-interpreter/token"
 )
 
 func Start(in io.Reader, out io.Writer) {
 	prompt := ">> "
 	scanner := bufio.NewScanner(in)
 	for {
-		fmt.Fprintf(out, prompt)
+		_, err := io.WriteString(out, prompt)
+		if err != nil {
+			return
+		}
 		// Read
 		if !scanner.Scan() {
 			if scanner.Err() != nil {
-				fmt.Fprintf(out, "scanning errored out")
+				_, err := io.WriteString(out, "scanning errored out")
+				if err != nil {
+					return
+				}
 			}
 			return
 		}
@@ -31,9 +36,24 @@ func Start(in io.Reader, out io.Writer) {
 
 		// Eval
 		l := lexer.New(input)
-		for tok := l.NextToken(); tok.Type != token.EOF; {
-			fmt.Fprintf(out, "%+v\n", tok)
-			tok = l.NextToken()
+		p := parser.New(l)
+		prg := p.ParseProgram()
+		if len(p.Errors) != 0 {
+			printParserErrors(out, p.Errors)
+			continue
+		}
+		_, err = io.WriteString(out, prg.String()+"\n")
+		if err != nil {
+			return
+		}
+	}
+}
+
+func printParserErrors(out io.Writer, errors []string) {
+	for _, msg := range errors {
+		_, err := io.WriteString(out, "\t"+msg+"\n")
+		if err != nil {
+			return
 		}
 	}
 }

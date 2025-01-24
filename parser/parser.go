@@ -15,7 +15,7 @@ type Parser struct {
 	lexer         *lexer.Lexer
 	curToken      token.Token
 	peekToken     token.Token
-	errors        []string
+	Errors        []string
 	prefixParsers map[token.TokenType]prefixParsingFunction
 	infixParsers  map[token.TokenType]infixParsingFunction
 }
@@ -24,7 +24,7 @@ func New(lexer *lexer.Lexer) *Parser {
 	parser := &Parser{lexer: lexer}
 	parser.curToken = lexer.NextToken()
 	parser.peekToken = lexer.NextToken()
-	parser.errors = []string{}
+	parser.Errors = []string{}
 	parser.prefixParsers = make(map[token.TokenType]prefixParsingFunction)
 	parser.infixParsers = make(map[token.TokenType]infixParsingFunction)
 
@@ -160,7 +160,7 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 	exp := &ast.IntegerLiteral{Token: p.curToken}
 	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
 	if err != nil {
-		p.errors = append(p.errors, fmt.Sprintf("cannot parse %q as integer", p.curToken.Literal))
+		p.Errors = append(p.Errors, fmt.Sprintf("cannot parse %q as integer", p.curToken.Literal))
 		return nil
 	}
 	exp.Value = value
@@ -278,7 +278,7 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	if prefixParser, ok := p.prefixParsers[p.curToken.Type]; ok {
 		leftExp = prefixParser()
 	} else {
-		p.errors = append(p.errors, fmt.Sprintf("no prefix parsing function registered for %q", p.curToken.Type))
+		p.Errors = append(p.Errors, fmt.Sprintf("no prefix parsing function registered for %s", p.curToken))
 	}
 
 	if infixParser, exists := p.infixParsers[p.peekToken.Type]; exists {
@@ -338,8 +338,8 @@ func (p *Parser) expectPeek(tokenType token.TokenType) bool {
 		p.Next()
 		return true
 	} else {
-		errMsg := fmt.Sprintf("expected token %s, got %s", tokenType, p.peekToken.Type)
-		p.errors = append(p.errors, errMsg)
+		errMsg := fmt.Sprintf("expected token %s, got %s", tokenType, p.peekToken)
+		p.Errors = append(p.Errors, errMsg)
 		return false
 	}
 }

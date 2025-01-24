@@ -363,9 +363,9 @@ func TestCallExpressionParsing(t *testing.T) {
 }
 
 func checkParserErrors(parser *Parser, t *testing.T, input string) {
-	if len(parser.errors) != 0 {
+	if len(parser.Errors) != 0 {
 		t.Logf("failed for input %s", input)
-		for _, err := range parser.errors {
+		for _, err := range parser.Errors {
 			t.Log("\t" + err)
 		}
 		t.FailNow()
