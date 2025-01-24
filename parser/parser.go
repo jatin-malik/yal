@@ -49,6 +49,7 @@ func New(lexer *lexer.Lexer) *Parser {
 	parser.registerInfix(token.NEQ, parser.parseInfixExpression)
 	parser.registerInfix(token.LT, parser.parseInfixExpression)
 	parser.registerInfix(token.GT, parser.parseInfixExpression)
+	parser.registerInfix(token.LPAREN, parser.parseCallExpression)
 
 	return parser
 }
@@ -228,6 +229,24 @@ func (p *Parser) parseFunctionParams() []*ast.Identifier {
 	return identifiers
 }
 
+func (p *Parser) parseCallArguments() []ast.Expression {
+	if p.curToken.Type != token.LPAREN {
+		return nil
+	}
+
+	p.Next()
+	var arguments []ast.Expression
+	for p.curToken.Type != token.RPAREN {
+		arg := p.parseExpression(LowestPrecedence)
+		arguments = append(arguments, arg)
+		p.Next()
+		if p.curToken.Type == token.COMMA {
+			p.Next()
+		}
+	}
+	return arguments
+}
+
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	if p.curToken.Type != token.LBRACE {
 		return nil
@@ -290,6 +309,15 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 		return nil
 	}
 	return exp
+}
+
+func (p *Parser) parseCallExpression(left ast.Expression) ast.Expression {
+	ce := &ast.CallExpression{
+		Token:    p.curToken,
+		Function: left,
+	}
+	ce.Arguments = p.parseCallArguments()
+	return ce
 }
 
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {

@@ -293,6 +293,75 @@ func TestIfElseConditionalParsing(t *testing.T) {
 
 }
 
+func TestCallExpressionParsing(t *testing.T) {
+	tests := []struct {
+		input                    string
+		expectedExpressionString string
+	}{
+		// ================================
+		// Basic function call
+		// ================================
+		{"add(2, 3)", "add(2, 3)"},
+		{"subtract(10, 5)", "subtract(10, 5)"},
+		{"sqrt(25)", "sqrt(25)"},
+
+		// ================================
+		// Function calls with expressions as arguments
+		// ================================
+		{"add(2 + 3, 4 * 5)", "add(( 2 + 3 ), ( 4 * 5 ))"},
+		{"max(x, y + z)", "max(x, ( y + z ))"},
+
+		// ================================
+		// Function call with nested function calls
+		// ================================
+		{"print(add(2, 3))", "print(add(2, 3))"},
+		{"sqrt(add(1, 2))", "sqrt(add(1, 2))"},
+
+		// ================================
+		// Edge case: Function with no arguments
+		// ================================
+		{"noop()", "noop()"},
+
+		// ================================
+		// Edge case: Function with many arguments
+		// ================================
+		{"longFunctionName(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
+			"longFunctionName(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)"},
+
+		// ================================
+		// Edge case: Multiple nested function calls
+		// ================================
+		{"outer(inner(1, 2), inner(3, 4))", "outer(inner(1, 2), inner(3, 4))"},
+
+		// ================================
+		// Edge case: Nested functions with expressions
+		// ================================
+		{"outer(inner(1 + 2, 3 * 4), 5)", "outer(inner(( 1 + 2 ), ( 3 * 4 )), 5)"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		parser := New(l)
+
+		program := parser.ParseProgram()
+
+		checkParserErrors(parser, t, tt.input)
+
+		if len(program.Statements) != 1 {
+			t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
+		}
+
+		if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
+			t.Error("expected an expression statement")
+		} else {
+			if stmt.String() != tt.expectedExpressionString {
+				t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+			}
+		}
+	}
+
+}
+
 func checkParserErrors(parser *Parser, t *testing.T, input string) {
 	if len(parser.errors) != 0 {
 		t.Logf("failed for input %s", input)

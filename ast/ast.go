@@ -211,6 +211,35 @@ func (ie InfixExpression) TokenLiteral() string {
 	return ie.Token.Literal
 }
 
+type CallExpression struct {
+	Token     token.Token
+	Function  Expression
+	Arguments []Expression
+}
+
+func (ce CallExpression) expressionBehaviour() {}
+
+func (ce CallExpression) String() string {
+	var buf bytes.Buffer
+	buf.WriteString(ce.Function.String())
+	buf.WriteString("(")
+	if len(ce.Arguments) > 0 {
+		for i, a := range ce.Arguments {
+			if i > 0 {
+				buf.WriteString(", ")
+
+			}
+			buf.WriteString(a.String())
+		}
+	}
+	buf.WriteString(")")
+	return buf.String()
+}
+
+func (ce CallExpression) TokenLiteral() string {
+	return ce.Token.Literal
+}
+
 type Identifier struct {
 	Token token.Token // for debugging
 	Value string      // Literal value of the identifier
