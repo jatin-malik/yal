@@ -292,7 +292,7 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 }
 
 func (p *Parser) parsePrefixExpression() ast.Expression {
-	pe := &ast.PrefixExpression{Token: p.curToken}
+	pe := &ast.PrefixExpression{Token: p.curToken, Operator: p.curToken.Literal}
 	curPrecedence := getTokenPrecedence(p.curToken.Type)
 	p.Next()
 	pe.Right = p.parseExpression(curPrecedence)

@@ -3,6 +3,7 @@ package repl
 
 import (
 	"bufio"
+	"github.com/jatin-malik/make-thy-interpreter/evaluator"
 	"github.com/jatin-malik/make-thy-interpreter/parser"
 	"io"
 	"strings"
@@ -14,17 +15,11 @@ func Start(in io.Reader, out io.Writer) {
 	prompt := ">> "
 	scanner := bufio.NewScanner(in)
 	for {
-		_, err := io.WriteString(out, prompt)
-		if err != nil {
-			return
-		}
+		io.WriteString(out, prompt)
 		// Read
 		if !scanner.Scan() {
 			if scanner.Err() != nil {
-				_, err := io.WriteString(out, "scanning errored out")
-				if err != nil {
-					return
-				}
+				io.WriteString(out, "scanning errored out")
 			}
 			return
 		}
@@ -42,10 +37,9 @@ func Start(in io.Reader, out io.Writer) {
 			printParserErrors(out, p.Errors)
 			continue
 		}
-		_, err = io.WriteString(out, prg.String()+"\n")
-		if err != nil {
-			return
-		}
+		obj := evaluator.Eval(prg)
+		io.WriteString(out, obj.Inspect())
+		io.WriteString(out, "\n")
 	}
 }
 

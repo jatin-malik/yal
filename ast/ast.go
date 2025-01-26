@@ -168,8 +168,9 @@ func (fl FunctionLiteral) TokenLiteral() string {
 }
 
 type PrefixExpression struct {
-	Token token.Token
-	Right Expression
+	Token    token.Token
+	Operator string
+	Right    Expression
 }
 
 func (pe PrefixExpression) expressionBehaviour() {}
@@ -177,7 +178,7 @@ func (pe PrefixExpression) expressionBehaviour() {}
 func (pe PrefixExpression) String() string {
 	var buf bytes.Buffer
 	buf.WriteString("( ")
-	buf.WriteString(pe.TokenLiteral())
+	buf.WriteString(pe.Operator)
 	buf.WriteString(pe.Right.String())
 	buf.WriteString(" )")
 	return buf.String()
