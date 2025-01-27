@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"fmt"
 	"github.com/jatin-malik/make-thy-interpreter/ast"
 	"github.com/jatin-malik/make-thy-interpreter/object"
 )
@@ -14,16 +15,22 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			if isReturnValue(result) {
 				return result.(*object.ReturnValue).Value // unwrap
 			}
+			if isErrorValue(result) {
+				return result // no unwrap
+			}
 		}
 	case *ast.BlockStatement:
 		for _, stmt := range v.Statements {
 			result = Eval(stmt, env)
-			if isReturnValue(result) {
+			if isReturnValue(result) || isErrorValue(result) {
 				return result
 			}
 		}
 	case *ast.ReturnStatement:
 		obj := Eval(v.Value, env)
+		if isErrorValue(obj) {
+			return obj
+		}
 		result = &object.ReturnValue{Value: obj}
 	case *ast.ExpressionStatement:
 		result = Eval(v.Expr, env)
@@ -33,13 +40,25 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		result = getBooleanObject(v.Value)
 	case *ast.PrefixExpression:
 		operandObject := Eval(v.Right, env)
+		if isErrorValue(operandObject) {
+			return operandObject
+		}
 		result = evalPrefixExpression(v.Operator, operandObject)
 	case *ast.InfixExpression:
 		leftObj := Eval(v.Left, env)
+		if isErrorValue(leftObj) {
+			return leftObj
+		}
 		rightObj := Eval(v.Right, env)
+		if isErrorValue(rightObj) {
+			return rightObj
+		}
 		result = evalInfixExpression(v.Operator, leftObj, rightObj)
 	case *ast.IfElseConditional:
 		conditionObj := Eval(v.Condition, env)
+		if isErrorValue(conditionObj) {
+			return conditionObj
+		}
 		if isTruthy(conditionObj) {
 			result = Eval(v.Consequence, env)
 		} else {
@@ -51,11 +70,15 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 	case *ast.LetStatement:
 		rightObj := Eval(v.Right, env)
+		if isErrorValue(rightObj) {
+			return rightObj
+		}
 		env.Set(v.Name.Value, rightObj)
 	case *ast.Identifier:
 		result = env.Get(v.Value)
 	default:
-		result = object.NULL
+		msg := fmt.Sprintf("Unknown statement type: %T", v)
+		result = object.NewError(msg)
 	}
 
 	return result
@@ -75,14 +98,16 @@ func evalPrefixExpression(operator string, right object.Object) object.Object {
 	case "!":
 		return evalBangPrefixExpression(right)
 	default:
-		return object.NULL
+		msg := fmt.Sprintf("Unknown operator: %s", operator)
+		return object.NewError(msg)
 	}
 }
 
 func evalInfixExpression(operator string, left, right object.Object) object.Object {
 	// check for type mismatch
 	if left.Type() != right.Type() {
-		return object.NULL
+		errorMsg := fmt.Sprintf("Incompatible types: %s and %s", left.Type(), right.Type())
+		return object.NewError(errorMsg)
 	}
 
 	switch operator {
@@ -141,6 +166,9 @@ func evalSlashInfixExpression(left, right object.Object) object.Object {
 	l, ok1 := left.(*object.Integer)
 	r, ok2 := right.(*object.Integer)
 	if ok1 && ok2 {
+		if r.Value == 0 {
+			return object.NewError("Division by zero")
+		}
 		return &object.Integer{Value: l.Value / r.Value}
 	} else {
 		return object.NULL
@@ -194,7 +222,8 @@ func evalMinusPrefixExpression(right object.Object) object.Object {
 	if i, ok := right.(*object.Integer); ok {
 		return &object.Integer{Value: -i.Value}
 	} else {
-		return object.NULL
+		msg := fmt.Sprintf("Invalid type %s with operator '-'", right.Type())
+		return object.NewError(msg)
 	}
 }
 
@@ -220,6 +249,13 @@ func isNull(obj object.Object) bool {
 
 func isReturnValue(obj object.Object) bool {
 	if _, ok := obj.(*object.ReturnValue); ok {
+		return true
+	}
+	return false
+}
+
+func isErrorValue(obj object.Object) bool {
+	if _, ok := obj.(*object.Error); ok {
 		return true
 	}
 	return false

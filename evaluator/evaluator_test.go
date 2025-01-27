@@ -295,17 +295,73 @@ func TestEvalReturnStatements(t *testing.T) {
 	}
 }
 
+// TODO: Put these scenarios with their respective normal cases in other test functions.
+func TestEvalErrorHandling(t *testing.T) {
+	tests := []struct {
+		input         string
+		expectedError string
+	}{
+		// ================================
+		// Undefined Variables
+		// ================================
+		{"return x;", `Undefined variable "x"`},                           // using undefined variable 'x'
+		{"let a = 5; return b;", `Undefined variable "b"`},                // 'b' is not defined
+		{"let a = 5; let b = a + c; return a;", `Undefined variable "c"`}, // 'c' is undefined
+
+		// ================================
+		// Division by Zero
+		// ================================
+		{"let x = 5; let y = 0; return x / y;", "Division by zero"}, // division by zero
+		{"return 10 / 0;", "Division by zero"},                      // division by zero
+
+		// ================================
+		// Invalid Operations
+		// ================================
+		//{"return 'string' + 5;", "Runtime Error: Invalid operation between 'string' and 'number'."}, // invalid type operation
+		{"let a = true; let b = 10; return a + b;", "Incompatible types: BOOLEAN and INTEGER"}, // invalid type operation
+		//{"let a = 10; let b = 'hello'; return a - b;", "Runtime Error: Invalid operation between 'number' and 'string'."}, // invalid type operation
+		{"-true", "Invalid type BOOLEAN with operator '-'"},
+		{"!(true+2)", "Incompatible types: BOOLEAN and INTEGER"},
+
+		// ================================
+		// Invalid Function Call
+		// ================================
+		//{"let func = fn() { return 5; }; func(10);", "Runtime Error: Invalid function call with arguments."}, // function doesn't accept arguments
+		//{"let func = fn(x) { return x; }; func();", "Runtime Error: Missing argument for function 'func'."},  // missing argument for function
+
+		// ================================
+		// Invalid Condition Expressions
+		// ================================
+		{"if (x > 5) { return 1; } else { return 0; }", `Undefined variable "x"`}, // undefined variable 'x'
+		{"if (10 / 0) { return 1; } else { return 0; }", "Division by zero"},      // division by zero in condition
+
+		// ================================
+		// Type Mismatch in Conditionals
+		// ================================
+		{"if (true == 2) { return 1; } else { return 0; }", "Incompatible types: BOOLEAN and INTEGER"},
+		{"if (false > 5) { return 1; } else { return 0; }", "Incompatible types: BOOLEAN and INTEGER"},
+	}
+
+	for _, tt := range tests {
+		obj := testEval(tt.input)
+		if obj != nil {
+			testErrorObject(t, obj, tt.expectedError)
+		}
+
+	}
+}
+
 func testEval(input string) object.Object {
 	l := lexer.New(input)
 	p := parser.New(l)
-
+	prg := p.ParseProgram()
 	if len(p.Errors) != 0 {
+		fmt.Printf("parser errors for input: %q\n", input)
 		for _, err := range p.Errors {
-			fmt.Println(err)
+			fmt.Println("\t" + err)
 		}
 		return nil
 	}
-	prg := p.ParseProgram()
 	env := object.NewEnvironment()
 	obj := Eval(prg, env)
 	return obj
@@ -335,6 +391,17 @@ func testBooleanObject(t *testing.T, obj object.Object, expected bool) {
 		}
 	} else {
 		t.Errorf("expected *object.Boolean, got %T", obj)
+
+	}
+}
+
+func testErrorObject(t *testing.T, obj object.Object, expectedError string) {
+	if err, ok := obj.(*object.Error); ok {
+		if err.Message != expectedError {
+			t.Errorf("expected error msg %q, got %q", expectedError, err.Message)
+		}
+	} else {
+		t.Errorf("expected *object.Error, got %T", obj)
 
 	}
 }

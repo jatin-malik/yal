@@ -9,6 +9,7 @@ const (
 	BooleanObject     ObjectType = "BOOLEAN"
 	NullObject        ObjectType = "NULL"
 	ReturnValueObject ObjectType = "RETURN_VALUE"
+	ErrorValueObject  ObjectType = "ERROR"
 )
 
 var (
@@ -70,6 +71,18 @@ func (returnValue *ReturnValue) Inspect() string {
 	return returnValue.Value.Inspect()
 }
 
+type Error struct {
+	Message string
+}
+
+func (error *Error) Type() ObjectType {
+	return ErrorValueObject
+}
+
+func (error *Error) Inspect() string {
+	return fmt.Sprintf("ERROR: %s", error.Message)
+}
+
 // Environment holds the current evaluation context/bindings. Also known as scope.
 type Environment struct {
 	store map[string]Object
@@ -83,9 +96,14 @@ func (env *Environment) Get(name string) Object {
 	if obj, ok := env.store[name]; ok {
 		return obj
 	}
-	return NULL
+	msg := fmt.Sprintf("Undefined variable %q", name)
+	return NewError(msg)
 }
 
 func (env *Environment) Set(name string, value Object) {
 	env.store[name] = value
+}
+
+func NewError(message string) *Error {
+	return &Error{Message: message}
 }
