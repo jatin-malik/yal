@@ -4,6 +4,7 @@ package repl
 import (
 	"bufio"
 	"github.com/jatin-malik/make-thy-interpreter/evaluator"
+	"github.com/jatin-malik/make-thy-interpreter/object"
 	"github.com/jatin-malik/make-thy-interpreter/parser"
 	"io"
 	"strings"
@@ -14,6 +15,7 @@ import (
 func Start(in io.Reader, out io.Writer) {
 	prompt := ">> "
 	scanner := bufio.NewScanner(in)
+	env := object.NewEnvironment(nil) // shared scope across all REPL statements
 	for {
 		io.WriteString(out, prompt)
 		// Read
@@ -37,9 +39,12 @@ func Start(in io.Reader, out io.Writer) {
 			printParserErrors(out, p.Errors)
 			continue
 		}
-		obj := evaluator.Eval(prg)
-		io.WriteString(out, obj.Inspect())
-		io.WriteString(out, "\n")
+		obj := evaluator.Eval(prg, env)
+		if obj != nil {
+			io.WriteString(out, obj.Inspect())
+			io.WriteString(out, "\n")
+		}
+
 	}
 }
 
