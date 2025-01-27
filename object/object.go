@@ -1,6 +1,11 @@
 package object
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"github.com/jatin-malik/make-thy-interpreter/ast"
+	"strings"
+)
 
 type ObjectType string
 
@@ -10,6 +15,7 @@ const (
 	NullObject        ObjectType = "NULL"
 	ReturnValueObject ObjectType = "RETURN_VALUE"
 	ErrorValueObject  ObjectType = "ERROR"
+	FunctionObject    ObjectType = "FUNCTION"
 )
 
 var (
@@ -45,6 +51,30 @@ func (boolean *Boolean) Type() ObjectType {
 
 func (boolean *Boolean) Inspect() string {
 	return fmt.Sprintf("%t", boolean.Value)
+}
+
+type Function struct {
+	Env        *Environment
+	Parameters []*ast.Identifier
+	Body       *ast.BlockStatement
+}
+
+func (function *Function) Type() ObjectType {
+	return FunctionObject
+}
+
+func (function *Function) Inspect() string {
+	var out bytes.Buffer
+	var params []string
+	for _, p := range function.Parameters {
+		params = append(params, p.String())
+	}
+	out.WriteString("fn(")
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(") {\n")
+	out.WriteString(function.Body.String())
+	out.WriteString("\n}")
+	return out.String()
 }
 
 // Null is a billion-dollar mistake but sure, why not!
@@ -86,18 +116,24 @@ func (error *Error) Inspect() string {
 // Environment holds the current evaluation context/bindings. Also known as scope.
 type Environment struct {
 	store map[string]Object
+	outer *Environment
 }
 
-func NewEnvironment() *Environment {
-	return &Environment{store: make(map[string]Object)}
+func NewEnvironment(outer *Environment) *Environment {
+	return &Environment{store: make(map[string]Object), outer: outer}
 }
 
 func (env *Environment) Get(name string) Object {
 	if obj, ok := env.store[name]; ok {
 		return obj
+	} else {
+		if env.outer != nil {
+			return env.outer.Get(name)
+		} else {
+			msg := fmt.Sprintf("Undefined variable %q", name)
+			return NewError(msg)
+		}
 	}
-	msg := fmt.Sprintf("Undefined variable %q", name)
-	return NewError(msg)
 }
 
 func (env *Environment) Set(name string, value Object) {

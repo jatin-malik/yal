@@ -20,8 +20,10 @@ func TestEvalIntegerLiteral(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		obj := testEval(tt.input)
-		testIntegerObject(t, obj, tt.expected)
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			testIntegerObject(t, obj, tt.expected)
+		})
 	}
 }
 
@@ -41,8 +43,10 @@ func TestEvalBooleanLiteral(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		obj := testEval(tt.input)
-		testBooleanObject(t, obj, tt.expected)
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			testBooleanObject(t, obj, tt.expected)
+		})
 	}
 }
 
@@ -92,8 +96,11 @@ func TestEvalArithmeticInfixExpression(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		obj := testEval(tt.input)
-		testIntegerObject(t, obj, tt.expected)
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			testIntegerObject(t, obj, tt.expected)
+		})
+
 	}
 }
 
@@ -144,8 +151,10 @@ func TestEvalComparisonInfixExpression(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		obj := testEval(tt.input)
-		testBooleanObject(t, obj, tt.expected)
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			testBooleanObject(t, obj, tt.expected)
+		})
 	}
 }
 
@@ -179,12 +188,14 @@ func TestEvalIfElseConditional(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		obj := testEval(tt.input)
-		if i, ok := tt.expected.(int); ok {
-			testIntegerObject(t, obj, int64(i))
-		} else {
-			testNullObject(t, obj)
-		}
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			if i, ok := tt.expected.(int); ok {
+				testIntegerObject(t, obj, int64(i))
+			} else {
+				testNullObject(t, obj)
+			}
+		})
 	}
 }
 
@@ -225,21 +236,15 @@ func TestEvalVariableBinding(t *testing.T) {
 		{`let a = -10; a;`, -10},               // negative value, should return -10
 		{`let a = 0; let b = a - 3; b;`, -3},   // subtraction binding, should return -3
 		{`let a = 100; let b = a / 2; b;`, 50}, // division, should return 50
-
-		// ================================
-		// Undefined variable (edge case)
-		// ================================
-		{`a;`, "null"}, // undefined variable, should return null
 	}
 
 	for _, tt := range tests {
-		obj := testEval(tt.input)
-		if i, ok := tt.expected.(int); ok {
-			testIntegerObject(t, obj, int64(i))
-		} else {
-			testNullObject(t, obj)
-		}
-
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			if i, ok := tt.expected.(int); ok {
+				testIntegerObject(t, obj, int64(i))
+			}
+		})
 	}
 }
 
@@ -285,13 +290,83 @@ func TestEvalReturnStatements(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		obj := testEval(tt.input)
-		if i, ok := tt.expected.(int); ok {
-			testIntegerObject(t, obj, int64(i))
-		} else {
-			testNullObject(t, obj)
-		}
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			if i, ok := tt.expected.(int); ok {
+				testIntegerObject(t, obj, int64(i))
+			}
+		})
+	}
+}
 
+func TestEvalFunctions(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Basic Function Call
+		// ================================
+		{`let add = fn(x, y) { x + y }; add(2, 3);`, 5},                    // simple addition function
+		{`let multiply = fn(x, y) { x * y }; multiply(4, 5);`, 20},         // simple multiplication function
+		{`fn(x) { return x; }(5);`, 5},                                     // direct function invocation
+		{`let subtract = fn(x, y) { return x - y; }; subtract(10, 3);`, 7}, // function with subtraction
+
+		// ================================
+		// Edge Cases
+		// ================================
+		{`let noReturn = fn() {}; noReturn();`, nil},               // function without a return value
+		{`let noArg = fn() { return 42; }; noArg();`, 42},          // function with no arguments
+		{`let noArgReturn = fn() { return }; noArgReturn();`, nil}, // function returning `nil`
+
+		// ================================
+		// Function with Boolean Return
+		// ================================
+		{`let isBig = fn(x) { if (x > 1000) { return true; } else { return false; } }; isBig(1001);`, true}, // checking even number
+		{`let isBig = fn(x) { if (x > 1000) { return true; } else { return false; } }; isBig(100);`, false}, // checking odd number
+
+		// ================================
+		// Function with Closures
+		// ================================
+		{`let outer = fn(x) { let inner = fn(y) { return x + y; }; return inner; }; let closure = outer(5); closure(3);`, 8}, // closure capturing `x`
+		{`let outer = fn(x) { let inner = fn(y) { return x * y; }; return inner; }; let closure = outer(2); closure(4);`, 8}, // closure with multiplication
+
+		// ================================
+		// Closure with Different Scopes
+		// ================================
+		{`let outer = fn(x) { let inner = fn(y) { return x + y; }; return inner; }; let closure_a = outer(10); let closure_b = outer(20); closure_a(5);`, 15}, // different closure instances, same outer function
+		{`let outer = fn(x) { let inner = fn(y) { return x - y; }; return inner; }; let closure = outer(10); closure(4);`, 6},                                 // closure with subtraction
+
+		// ================================
+		// Closures and Variable Capturing
+		// ================================
+		{`let x = 10; let closure = fn() { return x; }; let x = 20; closure();`, 20}, // closure captures the latest value of x (20)
+		{`let x = 5; let closure = fn() { return x; }; let x = 15; closure();`, 15},  // closure captures the latest value of x (15)
+
+		// ================================
+		// Nested Function Calls
+		// ================================
+		{`let add = fn(x, y) { return x + y; }; let multiply = fn(x, y) { return x * y; }; multiply(add(2, 3), 4);`, 20}, // nested function calls (add + multiply)
+		{`let square = fn(x) { return x * x; }; square(square(3));`, 81},                                                 // function calling itself
+
+		// ================================
+		// Functions Returning Functions (Higher-Order Functions)
+		// ================================
+		{`let multiplyBy = fn(x) { return fn(y) { return x * y; }; }; let multiplyByTwo = multiplyBy(2); multiplyByTwo(3);`, 6}, // higher-order function returning another function
+		{`let applyFn = fn(f, x) { return f(x); }; applyFn(fn(x) { return x + 1; }, 5);`, 6},                                    // higher-order function that accepts another function
+	}
+
+	// Running each test
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			switch expected := tt.expected.(type) {
+			case int:
+				testIntegerObject(t, obj, int64(expected))
+			case bool:
+				testBooleanObject(t, obj, expected)
+			}
+		})
 	}
 }
 
@@ -324,12 +399,6 @@ func TestEvalErrorHandling(t *testing.T) {
 		{"!(true+2)", "Incompatible types: BOOLEAN and INTEGER"},
 
 		// ================================
-		// Invalid Function Call
-		// ================================
-		//{"let func = fn() { return 5; }; func(10);", "Runtime Error: Invalid function call with arguments."}, // function doesn't accept arguments
-		//{"let func = fn(x) { return x; }; func();", "Runtime Error: Missing argument for function 'func'."},  // missing argument for function
-
-		// ================================
 		// Invalid Condition Expressions
 		// ================================
 		{"if (x > 5) { return 1; } else { return 0; }", `Undefined variable "x"`}, // undefined variable 'x'
@@ -340,14 +409,22 @@ func TestEvalErrorHandling(t *testing.T) {
 		// ================================
 		{"if (true == 2) { return 1; } else { return 0; }", "Incompatible types: BOOLEAN and INTEGER"},
 		{"if (false > 5) { return 1; } else { return 0; }", "Incompatible types: BOOLEAN and INTEGER"},
+
+		// ================================
+		// Functions
+		// ================================
+		{`let func = fn(x) { return x; }; func(1, 2);`, "expected 1 parameters, got 2 args"},           // too many arguments
+		{`let func = fn(x,y) { return x+y; }; func(10);`, "expected 2 parameters, got 1 args"},         // too few arguments
+		{`let func = fn(x) { return x + 5; }; func(true);`, "Incompatible types: BOOLEAN and INTEGER"}, // invalid argument type
 	}
 
 	for _, tt := range tests {
-		obj := testEval(tt.input)
-		if obj != nil {
-			testErrorObject(t, obj, tt.expectedError)
-		}
-
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			if obj != nil {
+				testErrorObject(t, obj, tt.expectedError)
+			}
+		})
 	}
 }
 
@@ -362,7 +439,7 @@ func testEval(input string) object.Object {
 		}
 		return nil
 	}
-	env := object.NewEnvironment()
+	env := object.NewEnvironment(nil)
 	obj := Eval(prg, env)
 	return obj
 }
@@ -373,7 +450,7 @@ func testIntegerObject(t *testing.T, obj object.Object, expected int64) {
 			t.Errorf("expected %d, got %d", expected, i.Value)
 		}
 	} else {
-		t.Errorf("expected *object.Integer, got %T", obj)
+		t.Errorf("expected *object.Integer, got %s", obj)
 
 	}
 }

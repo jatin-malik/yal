@@ -38,6 +38,29 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		result = &object.Integer{Value: v.Value}
 	case *ast.BooleanLiteral:
 		result = getBooleanObject(v.Value)
+	case *ast.FunctionLiteral:
+		result = &object.Function{
+			Env:        env,
+			Parameters: v.Parameters,
+			Body:       v.Body,
+		}
+	case *ast.CallExpression:
+		fn := Eval(v.Function, env)
+		if isErrorValue(fn) {
+			return fn
+		}
+
+		var args []object.Object
+		for _, arg := range v.Arguments {
+			result = Eval(arg, env)
+			if isErrorValue(result) {
+				return result
+			}
+			args = append(args, result)
+		}
+
+		result = evalCallExpression(fn, args)
+
 	case *ast.PrefixExpression:
 		operandObject := Eval(v.Right, env)
 		if isErrorValue(operandObject) {
@@ -232,6 +255,33 @@ func evalBangPrefixExpression(right object.Object) object.Object {
 		return object.FALSE
 	}
 	return object.TRUE
+}
+
+func evalCallExpression(function object.Object, args []object.Object) object.Object {
+	if fn, ok := function.(*object.Function); !ok {
+		msg := fmt.Sprintf("expected *object.Function, got %s", function.Type())
+		return object.NewError(msg)
+	} else {
+
+		// Extend the environment for this function evaluation
+		extendedEnv := object.NewEnvironment(fn.Env)
+
+		if len(fn.Parameters) != len(args) {
+			msg := fmt.Sprintf("expected %d parameters, got %d args", len(fn.Parameters), len(args))
+			return object.NewError(msg)
+		}
+
+		for idx, param := range fn.Parameters {
+			extendedEnv.Set(param.Value, args[idx])
+		}
+
+		result := Eval(fn.Body, extendedEnv)
+		if isReturnValue(result) {
+			return result.(*object.ReturnValue).Value // unwrap
+		}
+		return result
+	}
+
 }
 
 func isTruthy(obj object.Object) bool {
