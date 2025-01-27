@@ -149,6 +149,152 @@ func TestEvalComparisonInfixExpression(t *testing.T) {
 	}
 }
 
+func TestEvalIfElseConditional(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Basic if-else conditions
+		// ================================
+		{`if (2 > 1) { 1 } else { 0 }`, 1},
+		{`if (1 > 2) { 1 } else { 0 }`, 0},
+		{`if (5 == 5) { 10 } else { 0 }`, 10},
+		{`if (0 != 1) { 100 } else { 0 }`, 100},
+
+		// ================================
+		// if with nested conditions
+		// ================================
+		{`if (5 > 2) { if (3 > 1) { 10 } else { 20 } } else { 30 }`, 10},
+		{`if (3 < 2) { if (4 > 5) { 10 } else { 20 } } else { 30 }`, 30},
+
+		// Others
+		{`if (5 > 2) { 1 }`, 1},
+		{`if (0 == 0) { 1 } else { 0 }`, 1},
+		{`if (0 == 1) { 1 } else { 0 }`, 0},
+		{`if (5 == 5) { if (2 > 1) { 15 } else { 0 } } else { 100 }`, 15},
+		{`if (false) { 5 } else { 0 }`, 0},
+		{`if (2) { 5 } else { 0 }`, 5},
+		{`if (2==1) { 5 }`, "null"},
+	}
+
+	for _, tt := range tests {
+		obj := testEval(tt.input)
+		if i, ok := tt.expected.(int); ok {
+			testIntegerObject(t, obj, int64(i))
+		} else {
+			testNullObject(t, obj)
+		}
+	}
+}
+
+func TestEvalVariableBinding(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Basic variable binding
+		// ================================
+		{`let a = 5; a;`, 5},   // simple binding, should return 5
+		{`let b = 10; b;`, 10}, // simple binding, should return 10
+
+		// ================================
+		// Variable binding with expressions
+		// ================================
+		{`let x = 5 + 3; x;`, 8},   // binding with expression, should return 8
+		{`let y = 10 * 2; y;`, 20}, // binding with multiplication, should return 20
+		{`let z = 5; z * 2;`, 10},  // binding followed by an expression, should return 10
+
+		// ================================
+		// Rebinding variables (new assignment)
+		// ================================
+		{`let a = 5; let a = 10; a;`, 10},                 // rebinding variable a, should return 10
+		{`let a = 5; let b = 10; let a = 15; a + b;`, 25}, // rebinding a and adding with b, should return 25
+
+		// ================================
+		// Variable binding with conditional
+		// ================================
+		{`let a = 5; if (a == 5) { let b = 10; b } else { let b = 20; b }`, 10}, // true condition, should return 10
+		{`let a = 5; if (a != 5) { let b = 10; b } else { let b = 20; b }`, 20}, // false condition, should return 20
+
+		// ================================
+		// Edge cases
+		// ================================
+		{`let a = 0; let b = a + 5; b;`, 5},    // simple binding with a sum, should return 5
+		{`let a = -10; a;`, -10},               // negative value, should return -10
+		{`let a = 0; let b = a - 3; b;`, -3},   // subtraction binding, should return -3
+		{`let a = 100; let b = a / 2; b;`, 50}, // division, should return 50
+
+		// ================================
+		// Undefined variable (edge case)
+		// ================================
+		{`a;`, "null"}, // undefined variable, should return null
+	}
+
+	for _, tt := range tests {
+		obj := testEval(tt.input)
+		if i, ok := tt.expected.(int); ok {
+			testIntegerObject(t, obj, int64(i))
+		} else {
+			testNullObject(t, obj)
+		}
+
+	}
+}
+
+func TestEvalReturnStatements(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Basic return statement
+		// ================================
+		{`let a = 10; return a; 5`, 10},   // should return 10 (first return is evaluated)
+		{`return 42; 100`, 42},            // should return 42, second part is ignored
+		{`let x = 20; return x + 5;`, 25}, // return evaluates an expression, should return 25
+
+		// ================================
+		// Multiple return statements
+		// ================================
+		{`return 5; return 10;`, 5},      // should return 5, second return is ignored
+		{`return 5 + 5; return 10;`, 10}, // return evaluates first expression, should return 10
+		{`return 5 * 2; return 0;`, 10},  // evaluates the first return, should return 10
+
+		// ================================
+		// Return after assignments
+		// ================================
+		{`let a = 3; let b = 5; return a + b;`, 8},   // should return 8 (a + b)
+		{`let a = 3; return a * 2;`, 6},              // should return 6 (a * 2)
+		{`let x = 5; let y = 10; return x + y;`, 15}, // should return 15 (x + y)
+
+		// ================================
+		// Edge cases with return
+		// ================================
+		{`let a = 1; if (a == 1) { return a; } else { return 0; }`, 1}, // returns 1 since a == 1
+		{`let a = 0; if (a == 1) { return a; } else { return 0; }`, 0}, // returns 0 since a != 1
+
+		// ================================
+		// Unreachable code after return
+		// ================================
+		{`return 1; let x = 2; x;`, 1},           // `x` should never be evaluated after the return, should return 1
+		{`return 10; let a = 20; return a;`, 10}, // first return is evaluated, second return is ignored, should return 10
+		{`return 100; return 200;`, 100},         // second return is ignored, should return 100
+
+	}
+
+	for _, tt := range tests {
+		obj := testEval(tt.input)
+		if i, ok := tt.expected.(int); ok {
+			testIntegerObject(t, obj, int64(i))
+		} else {
+			testNullObject(t, obj)
+		}
+
+	}
+}
+
 func testEval(input string) object.Object {
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -160,7 +306,8 @@ func testEval(input string) object.Object {
 		return nil
 	}
 	prg := p.ParseProgram()
-	obj := Eval(prg)
+	env := object.NewEnvironment()
+	obj := Eval(prg, env)
 	return obj
 }
 
@@ -172,6 +319,12 @@ func testIntegerObject(t *testing.T, obj object.Object, expected int64) {
 	} else {
 		t.Errorf("expected *object.Integer, got %T", obj)
 
+	}
+}
+
+func testNullObject(t *testing.T, obj object.Object) {
+	if !isNull(obj) {
+		t.Errorf("expected null, got %v", obj)
 	}
 }
 

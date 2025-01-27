@@ -5,9 +5,10 @@ import "fmt"
 type ObjectType string
 
 const (
-	IntegerObject ObjectType = "INTEGER"
-	BooleanObject ObjectType = "BOOLEAN"
-	NullObject    ObjectType = "NULL"
+	IntegerObject     ObjectType = "INTEGER"
+	BooleanObject     ObjectType = "BOOLEAN"
+	NullObject        ObjectType = "NULL"
+	ReturnValueObject ObjectType = "RETURN_VALUE"
 )
 
 var (
@@ -55,4 +56,36 @@ func (null *Null) Type() ObjectType {
 
 func (null *Null) Inspect() string {
 	return "null"
+}
+
+type ReturnValue struct {
+	Value Object
+}
+
+func (returnValue *ReturnValue) Type() ObjectType {
+	return ReturnValueObject
+}
+
+func (returnValue *ReturnValue) Inspect() string {
+	return returnValue.Value.Inspect()
+}
+
+// Environment holds the current evaluation context/bindings. Also known as scope.
+type Environment struct {
+	store map[string]Object
+}
+
+func NewEnvironment() *Environment {
+	return &Environment{store: make(map[string]Object)}
+}
+
+func (env *Environment) Get(name string) Object {
+	if obj, ok := env.store[name]; ok {
+		return obj
+	}
+	return NULL
+}
+
+func (env *Environment) Set(name string, value Object) {
+	env.store[name] = value
 }

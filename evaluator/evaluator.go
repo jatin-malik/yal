@@ -5,28 +5,57 @@ import (
 	"github.com/jatin-malik/make-thy-interpreter/object"
 )
 
-func Eval(node ast.Node) object.Object {
+func Eval(node ast.Node, env *object.Environment) object.Object {
 	var result object.Object
 	switch v := node.(type) {
 	case *ast.Program:
 		for _, stmt := range v.Statements {
-			result = Eval(stmt)
+			result = Eval(stmt, env)
+			if isReturnValue(result) {
+				return result.(*object.ReturnValue).Value // unwrap
+			}
 		}
+	case *ast.BlockStatement:
+		for _, stmt := range v.Statements {
+			result = Eval(stmt, env)
+			if isReturnValue(result) {
+				return result
+			}
+		}
+	case *ast.ReturnStatement:
+		obj := Eval(v.Value, env)
+		result = &object.ReturnValue{Value: obj}
 	case *ast.ExpressionStatement:
-		result = Eval(v.Expr)
+		result = Eval(v.Expr, env)
 	case *ast.IntegerLiteral:
 		result = &object.Integer{Value: v.Value}
 	case *ast.BooleanLiteral:
 		result = getBooleanObject(v.Value)
 	case *ast.PrefixExpression:
-		operandObject := Eval(v.Right)
+		operandObject := Eval(v.Right, env)
 		result = evalPrefixExpression(v.Operator, operandObject)
 	case *ast.InfixExpression:
-		leftObj := Eval(v.Left)
-		rightObj := Eval(v.Right)
+		leftObj := Eval(v.Left, env)
+		rightObj := Eval(v.Right, env)
 		result = evalInfixExpression(v.Operator, leftObj, rightObj)
+	case *ast.IfElseConditional:
+		conditionObj := Eval(v.Condition, env)
+		if isTruthy(conditionObj) {
+			result = Eval(v.Consequence, env)
+		} else {
+			if v.Alternative != nil {
+				result = Eval(v.Alternative, env)
+			} else {
+				result = object.NULL
+			}
+		}
+	case *ast.LetStatement:
+		rightObj := Eval(v.Right, env)
+		env.Set(v.Name.Value, rightObj)
+	case *ast.Identifier:
+		result = env.Get(v.Value)
 	default:
-		return object.NULL
+		result = object.NULL
 	}
 
 	return result
@@ -186,7 +215,11 @@ func isTruthy(obj object.Object) bool {
 }
 
 func isNull(obj object.Object) bool {
-	if obj == object.NULL {
+	return obj == object.NULL
+}
+
+func isReturnValue(obj object.Object) bool {
+	if _, ok := obj.(*object.ReturnValue); ok {
 		return true
 	}
 	return false
