@@ -1,6 +1,8 @@
 package lexer
 
-import "github.com/jatin-malik/yal/token"
+import (
+	"github.com/jatin-malik/yal/token"
+)
 
 type Lexer struct {
 	input string // the input to the lexer i.e the source code
@@ -15,13 +17,11 @@ func New(input string) *Lexer {
 
 func (l *Lexer) NextToken() token.Token {
 	l.eatWhiteSpace() // whitespaces are just token separators for us
-
 	if l.pos >= len(l.input) {
 		return newToken(token.EOF, 0)
 	}
 
 	ch := l.input[l.pos]
-
 	var tok token.Token
 
 	switch ch {
@@ -30,6 +30,10 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Type = token.STRING
 	case '+':
 		tok = newToken(token.PLUS, ch)
+	case '#':
+		// Lexer skips over this. Comments are for mortal humans.
+		l.eatComment()
+		return l.NextToken()
 	case ':':
 		tok = newToken(token.COLON, ch)
 	case '-':
@@ -135,6 +139,14 @@ func (l *Lexer) readString() string {
 		l.pos++
 	}
 	return l.input[startingPos:l.pos]
+}
+
+func (l *Lexer) eatComment() {
+	if l.pos < len(l.input) && l.input[l.pos] == '#' {
+		for l.pos < len(l.input) && l.input[l.pos] != '\n' {
+			l.pos++
+		}
+	}
 }
 
 func (l *Lexer) eatWhiteSpace() {

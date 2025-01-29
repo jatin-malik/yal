@@ -42,10 +42,12 @@ func TestLexer(t *testing.T) {
 
 	t.Run("multi line input", func(t *testing.T) {
 
-		input := `let five=5;
+		input := `# Program started
+			let five=5;
+			# Just a comment
 			let ten = 10;
-			let add = fn(x,y){
-				x+y;
+			let add = fn(x,y){ # Add numbers
+				x+y; # return this
 			}
 			let result = add(five,ten);
 			-/*!<>50
@@ -59,7 +61,8 @@ func TestLexer(t *testing.T) {
 			5!=10
 			"hello"
 			"hello world"
-			[100,"hello",true]`
+			[100,"hello",true]
+			# Program ended`
 
 		l := lexer.New(input)
 
