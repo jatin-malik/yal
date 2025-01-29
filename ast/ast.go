@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/jatin-malik/yal/token"
+	"strings"
 )
 
 type Node interface {
@@ -250,6 +251,25 @@ func (all ArrayLiteral) String() string {
 
 func (all ArrayLiteral) TokenLiteral() string {
 	return all.Token.Literal
+}
+
+type HashLiteral struct {
+	Token token.Token
+	Pairs map[Expression]Expression
+}
+
+func (hl HashLiteral) expressionBehaviour() {}
+
+func (hl HashLiteral) String() string {
+	var pairs []string
+	for key, value := range hl.Pairs {
+		pairs = append(pairs, key.String()+": "+value.String())
+	}
+	return fmt.Sprintf("{%s}", strings.Join(pairs, ", "))
+}
+
+func (hl HashLiteral) TokenLiteral() string {
+	return hl.Token.Literal
 }
 
 type CallExpression struct {

@@ -18,6 +18,7 @@ const (
 	FunctionObject    ObjectType = "FUNCTION"
 	StringObject      ObjectType = "STRING"
 	ArrayObject       ObjectType = "ARRAY"
+	HashObject        ObjectType = "HASH"
 )
 
 var (
@@ -29,6 +30,15 @@ var (
 type Object interface {
 	Type() ObjectType
 	Inspect() string
+}
+
+type HashKey struct {
+	Type  ObjectType
+	Value string
+}
+
+type Hashable interface {
+	HashKey() HashKey
 }
 
 type Integer struct {
@@ -43,6 +53,10 @@ func (integer *Integer) Inspect() string {
 	return fmt.Sprintf("%d", integer.Value)
 }
 
+func (integer *Integer) HashKey() HashKey {
+	return HashKey{Type: integer.Type(), Value: integer.Inspect()}
+}
+
 type String struct {
 	Value string
 }
@@ -55,6 +69,10 @@ func (string *String) Inspect() string {
 	return string.Value
 }
 
+func (string *String) HashKey() HashKey {
+	return HashKey{Type: string.Type(), Value: string.Inspect()}
+}
+
 type Boolean struct {
 	Value bool
 }
@@ -65,6 +83,10 @@ func (boolean *Boolean) Type() ObjectType {
 
 func (boolean *Boolean) Inspect() string {
 	return fmt.Sprintf("%t", boolean.Value)
+}
+
+func (boolean *Boolean) HashKey() HashKey {
+	return HashKey{Type: boolean.Type(), Value: boolean.Inspect()}
 }
 
 type Array struct {
@@ -85,6 +107,31 @@ func (array *Array) Inspect() string {
 	out.WriteString(strings.Join(elements, ", "))
 	out.WriteString("]")
 	return out.String()
+}
+
+type Hash struct {
+	Pairs map[HashKey]Object
+}
+
+func (hash *Hash) Type() ObjectType {
+	return HashObject
+}
+
+func (hash *Hash) Inspect() string {
+	return "TODO"
+	//var out bytes.Buffer
+	//pairs := make(map[Object]Object)
+	//for k, v := range hash.Pairs {
+	//	pairs[k] = v
+	//}
+	//out.WriteString("{")
+	//for k, v := range pairs {
+	//	out.WriteString(k.Inspect())
+	//	out.WriteString(":")
+	//	out.WriteString(v.Inspect())
+	//}
+	//out.WriteString("}")
+	//return out.String()
 }
 
 type Function struct {

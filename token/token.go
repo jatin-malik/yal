@@ -20,6 +20,7 @@ const (
 	RPAREN    TokenType = ")"
 	LBRACE    TokenType = "{"
 	RBRACE    TokenType = "}"
+	COLON     TokenType = ":"
 
 	// Double char tokens
 	EQ  TokenType = "=="

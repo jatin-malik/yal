@@ -470,6 +470,107 @@ func TestEvalArrays(t *testing.T) {
 	}
 }
 
+func TestEvalHashAccess(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Basic Hash Access with String Keys
+		// ================================
+		{`{"name": "Alice", "age": 30}["name"]`, "Alice"},     // Access string key "name"
+		{`{"name": "Alice", "age": 30}["age"]`, int64(30)},    // Access string key "age"
+		{`{"score": 95, "passed": true}["score"]`, int64(95)}, // Access string key "score"
+		{`{"score": 95, "passed": true}["passed"]`, true},     // Access string key "passed"
+
+		// ================================
+		// Access with Integer Keys
+		// ================================
+		{`{1: "one", 2: "two", 3: "three"}[1]`, "one"},   // Access integer key 1
+		{`{1: "one", 2: "two", 3: "three"}[2]`, "two"},   // Access integer key 2
+		{`{1: "one", 2: "two", 3: "three"}[3]`, "three"}, // Access integer key 3
+
+		// ================================
+		// Access with Boolean Keys
+		// ================================
+		{`{true: "yes", false: "no"}[true]`, "yes"}, // Access boolean key true
+		{`{true: "yes", false: "no"}[false]`, "no"}, // Access boolean key false
+
+		// ================================
+		// Missing Keys (Should return null)
+		// ================================
+		{`{"name": "Alice"}["age"]`, nil}, // Accessing non-existent key "age"
+		{`{"score": 95}["passed"]`, nil},  // Accessing non-existent key "passed"
+
+		// ================================
+		// Invalid Key Types (e.g., arrays as keys)
+		// ================================
+		{`{[1,2]: "array"}[2]`, errors.New("key type ARRAY is not hashable")},      // Invalid key type: array as a key
+		{`{"name": "Alice"}[[1,2]]`, errors.New("key type ARRAY is not hashable")}, // Invalid key type: array as a key
+		{`{true: "yes"}[1]`, nil},
+
+		// ================================
+		// Nested Hash Access
+		// ================================
+		{`{"person": {"name": "Alice", "age": 30}}["person"]["name"]`, "Alice"},    // Access nested hash key "name"
+		{`{"person": {"name": "Alice", "age": 30}}["person"]["age"]`, int64(30)},   // Access nested hash key "age"
+		{`{"team": {"leader": "Bob", "members": 5}}["team"]["leader"]`, "Bob"},     // Access nested hash key "leader"
+		{`{"team": {"leader": "Bob", "members": 5}}["team"]["members"]`, int64(5)}, // Access nested hash key "members"
+
+		// ================================
+		// Nested Hash Access with Missing Keys
+		// ================================
+		{`{"team": {"leader": "Bob"}}["team"]["members"]`, nil},  // Accessing non-existent nested key "members"
+		{`{"team": {"leader": "Bob"}}["team"]["location"]`, nil}, // Accessing non-existent nested key "location"
+		{`{"person": {"name": "Alice"}}["person"]["age"]`, nil},  // Accessing non-existent nested key "age"
+
+		// ================================
+		// Nested Hash with Mixed Keys
+		// ================================
+		{`{"user": {1: "Bob", true: "Alice"}}["user"][1]`, "Bob"},      // Mixed key types in nested hash
+		{`{"user": {1: "Bob", true: "Alice"}}["user"][true]`, "Alice"}, // Mixed key types in nested hash
+
+		// ================================
+		// Out-of-Bounds Access (Accessing Hash Key of Another Hash/Array)
+		// ================================
+		{`{"nested": {"inner": {"key": "value"}}}["nested"]["inner"]["key"]`, "value"}, // Access nested keys
+		{`{"nested": {"inner": {"key": "value"}}}["nested"]["inner"][0]`, nil},         // Trying to access array index on a hash
+
+		// ================================
+		// Edge Cases with Nested Hashes and Missing Keys
+		// ================================
+		{`{"outer": {"inner": {"key": "value"}}}["outer"]["inner"]["missing"]`, nil},                                                       // Accessing non-existent key in nested hash
+		{`{"outer": {"inner": {"key": "value"}}}["outer"]["missing"]["key"]`, errors.New("index expression not supported for type: NULL")}, // Accessing non-existent outer key
+
+		// ================================
+		// Multiple Hashes with the Same Key
+		// ================================
+		{`{"user": {"name": "Bob"}}["user"]["name"]`, "Bob"},     // Access name from "user"
+		{`{"user": {"name": "Alice"}}["user"]["name"]`, "Alice"}, // Access name from "user"
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+
+			switch expected := tt.expected.(type) {
+			case int64:
+				testIntegerObject(t, obj, expected)
+			case string:
+				testStringObject(t, obj, expected)
+			case bool:
+				testBooleanObject(t, obj, expected)
+			case nil:
+				testNullObject(t, obj)
+			case error:
+				testErrorObject(t, obj, expected.Error())
+			default:
+				t.Errorf("unexpected type %T for expected value: %v", expected, expected)
+			}
+		})
+	}
+}
+
 func TestEvalStringConcatenation(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -979,3 +1080,40 @@ func testArrayObject(t *testing.T, obj object.Object, expected []interface{}) {
 		}
 	}
 }
+
+//func testHashObject(t *testing.T, obj object.Object, expected map[interface{}]interface{}) {
+//	// Ensure the object is of type Hash
+//	hash, ok := obj.(*object.Hash)
+//	if !ok {
+//		t.Fatalf("expected *Hash, got %T", obj)
+//	}
+//
+//	// Check the number of keys in the returned hash
+//	if len(hash.Pairs) != len(expected) {
+//		t.Fatalf("expected %d pairs, got %d", len(expected), len(hash.Pairs))
+//	}
+//
+//	// Iterate over the expected key-value pairs and compare
+//	for key, expectedValue := range expected {
+//		expectedKey := toHashableKey(key) // Convert the expected key into the correct type for comparison
+//		hashValue, ok := hash.Pairs[expectedKey]
+//		if !ok {
+//			t.Errorf("expected key %v not found in hash", key)
+//			continue
+//		}
+//
+//		// Compare the values (use deep equality depending on type)
+//		switch expectedValue := expectedValue.(type) {
+//		case int64:
+//			testIntegerObject(t, hashValue, expectedValue)
+//		case string:
+//			testStringObject(t, hashValue, expectedValue)
+//		case bool:
+//			testBooleanObject(t, hashValue, expectedValue)
+//		case nil:
+//			testNullObject(t, hashValue)
+//		default:
+//			t.Errorf("unexpected value type: %T", expectedValue)
+//		}
+//	}
+//}

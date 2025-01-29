@@ -303,8 +303,78 @@ func TestArrayLiteralParsing(t *testing.T) {
 			}
 		})
 	}
-
 }
+
+//TODO: This test asserts for the ordering of elements in hash, which is not guaranteed and thus it fails randomly. Fix it.
+//func TestHashLiteralParsing(t *testing.T) {
+//	tests := []struct {
+//		input                    string
+//		expectedExpressionString string
+//	}{
+//		// ================================
+//		// Basic Hashes
+//		// ================================
+//		{`{"name": "Alice", "age": 30}`, `{"name": "Alice", "age": 30}`},
+//		{`{"isStudent": true, "score": 85}`, `{"isStudent": true, "score": 85}`},
+//		{`{"x": 100, "y": 200}`, `{"x": 100, "y": 200}`},
+//		{`{"key": "value"}`, `{"key": "value"}`},
+//
+//		// ================================
+//		// Nested Hashes
+//		// ================================
+//		{`{"person": {"name": "Alice", "age": 30}, "status": "active"}`, `{"person": {"name": "Alice", "age": 30}, "status": "active"}`},
+//		{`{"config": {"max": 10, "min": 1}, "enabled": true}`, `{"config": {"max": 10, "min": 1}, "enabled": true}`},
+//
+//		// ================================
+//		// Hash Index Expressions
+//		// ================================
+//		{`{"name": "Alice", "age": 30}["name"]`, `{"name": "Alice", "age": 30}["name"]`},           // Access "Alice"
+//		{`{"isStudent": true, "score": 85}["score"]`, `{"isStudent": true, "score": 85}["score"]`}, // Access 85
+//		{`{"x": 100, "y": 200}["y"]`, `{"x": 100, "y": 200}["y"]`},                                 // Access 200
+//
+//		// ================================
+//		// Nested Hash Index Expressions
+//		// ================================
+//		{`{"person": {"name": "Alice", "age": 30}}["person"]["name"]`, `{"person": {"name": "Alice", "age": 30}}["person"]["name"]`}, // Access "Alice"
+//		{`{"config": {"max": 10, "min": 1}}["config"]["min"]`, `{"config": {"max": 10, "min": 1}}["config"]["min"]`},                 // Access 1
+//
+//		// ================================
+//		// Invalid Hash Index Expressions
+//		// ================================
+//		{`{"name": "Alice", "age": 30}["height"]`, `{"name": "Alice", "age": 30}["height"]`}, // Non-existent key (should return null or error)
+//		{`{"name": "Alice", "age": 30}[""]`, `{"name": "Alice", "age": 30}[""]`},             // Empty key (should return null or error)
+//
+//		// ================================
+//		// Empty Hash
+//		// ================================
+//		{`{}`, `{}`}, // Empty hash
+//	}
+//
+//	// Running each test
+//	for _, tt := range tests {
+//		t.Run(tt.input, func(t *testing.T) {
+//			l := lexer.New(tt.input)
+//			parser := New(l)
+//
+//			program := parser.ParseProgram()
+//
+//			checkParserErrors(parser, t, tt.input)
+//
+//			if len(program.Statements) != 1 {
+//				t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
+//			}
+//
+//			if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
+//				t.Error("expected an expression statement")
+//			} else {
+//				got := stmt.String()
+//				if got != tt.expectedExpressionString {
+//					t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, got)
+//				}
+//			}
+//		})
+//	}
+//}
 
 func TestIfElseConditionalParsing(t *testing.T) {
 	tests := []struct {

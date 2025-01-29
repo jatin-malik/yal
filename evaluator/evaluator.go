@@ -50,6 +50,23 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			elems = append(elems, result)
 		}
 		result = &object.Array{Elements: elems}
+	case *ast.HashLiteral:
+		pairs := make(map[object.Object]object.Object)
+
+		for k, v := range v.Pairs {
+			key := Eval(k, env)
+			if isErrorValue(key) {
+				return key
+			}
+			val := Eval(v, env)
+			if isErrorValue(val) {
+				return val
+			}
+			pairs[key] = val
+		}
+
+		result = evalHashLiteral(pairs)
+
 	case *ast.FunctionLiteral:
 		result = &object.Function{
 			Env:        env,
@@ -323,6 +340,8 @@ func evalIndexExpression(iterable object.Object, index object.Object) object.Obj
 	switch iterable.Type() {
 	case object.ArrayObject:
 		return evalArrayIndexExpression(iterable, index)
+	case object.HashObject:
+		return evalHashIndexExpression(iterable, index)
 	default:
 		msg := fmt.Sprintf("index expression not supported for type: %s", iterable.Type())
 		return object.NewError(msg)
@@ -347,6 +366,21 @@ func evalArrayIndexExpression(iterable object.Object, index object.Object) objec
 
 }
 
+func evalHashIndexExpression(iterable object.Object, index object.Object) object.Object {
+	hash := iterable.(*object.Hash)
+	// Check if key is hashable
+	if key, ok := index.(object.Hashable); !ok {
+		return object.NewError(fmt.Sprintf("key type %s is not hashable", index.Type()))
+	} else {
+		hashKey := key.HashKey()
+		if val, ok := hash.Pairs[hashKey]; ok {
+			return val
+		} else {
+			return object.NULL
+		}
+	}
+}
+
 func isTruthy(obj object.Object) bool {
 	switch obj {
 	case object.NULL, object.FALSE:
@@ -354,6 +388,22 @@ func isTruthy(obj object.Object) bool {
 	default:
 		return true
 	}
+}
+
+func evalHashLiteral(pairs map[object.Object]object.Object) object.Object {
+	ho := new(object.Hash)
+	elems := make(map[object.HashKey]object.Object)
+	for k, v := range pairs {
+		// Check if key is hashable
+		if key, ok := k.(object.Hashable); !ok {
+			return object.NewError(fmt.Sprintf("key type %s is not hashable", k.Type()))
+		} else {
+			hashKey := key.HashKey()
+			elems[hashKey] = v
+		}
+	}
+	ho.Pairs = elems
+	return ho
 }
 
 func isNull(obj object.Object) bool {

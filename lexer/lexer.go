@@ -30,6 +30,8 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Type = token.STRING
 	case '+':
 		tok = newToken(token.PLUS, ch)
+	case ':':
+		tok = newToken(token.COLON, ch)
 	case '-':
 		tok = newToken(token.MINUS, ch)
 	case '/':
