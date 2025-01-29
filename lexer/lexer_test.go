@@ -3,8 +3,8 @@ package lexer_test
 import (
 	"testing"
 
-	"github.com/jatin-malik/make-thy-interpreter/lexer"
-	"github.com/jatin-malik/make-thy-interpreter/token"
+	"github.com/jatin-malik/yal/lexer"
+	"github.com/jatin-malik/yal/token"
 )
 
 func TestLexer(t *testing.T) {

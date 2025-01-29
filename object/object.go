@@ -3,7 +3,7 @@ package object
 import (
 	"bytes"
 	"fmt"
-	"github.com/jatin-malik/make-thy-interpreter/ast"
+	"github.com/jatin-malik/yal/ast"
 	"strings"
 )
 

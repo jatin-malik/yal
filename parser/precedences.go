@@ -1,6 +1,6 @@
 package parser
 
-import "github.com/jatin-malik/make-thy-interpreter/token"
+import "github.com/jatin-malik/yal/token"
 
 // Operator precedences believed by the parser
 const (

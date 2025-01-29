@@ -3,9 +3,9 @@ package evaluator
 import (
 	"errors"
 	"fmt"
-	"github.com/jatin-malik/make-thy-interpreter/lexer"
-	"github.com/jatin-malik/make-thy-interpreter/object"
-	"github.com/jatin-malik/make-thy-interpreter/parser"
+	"github.com/jatin-malik/yal/lexer"
+	"github.com/jatin-malik/yal/object"
+	"github.com/jatin-malik/yal/parser"
 	"testing"
 )
 

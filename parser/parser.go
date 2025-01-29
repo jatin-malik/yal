@@ -2,9 +2,9 @@ package parser
 
 import (
 	"fmt"
-	"github.com/jatin-malik/make-thy-interpreter/ast"
-	"github.com/jatin-malik/make-thy-interpreter/lexer"
-	"github.com/jatin-malik/make-thy-interpreter/token"
+	"github.com/jatin-malik/yal/ast"
+	"github.com/jatin-malik/yal/lexer"
+	"github.com/jatin-malik/yal/token"
 	"strconv"
 )
 

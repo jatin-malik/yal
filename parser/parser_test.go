@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"github.com/jatin-malik/make-thy-interpreter/ast"
+	"github.com/jatin-malik/yal/ast"
 	"testing"
 
-	"github.com/jatin-malik/make-thy-interpreter/lexer"
+	"github.com/jatin-malik/yal/lexer"
 )
 
 func TestLetStatement(t *testing.T) {

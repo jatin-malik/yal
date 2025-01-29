@@ -1,6 +1,6 @@
 package lexer
 
-import "github.com/jatin-malik/make-thy-interpreter/token"
+import "github.com/jatin-malik/yal/token"
 
 type Lexer struct {
 	input string // the input to the lexer i.e the source code

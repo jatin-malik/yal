@@ -1,3 +1,3 @@
-module github.com/jatin-malik/make-thy-interpreter
+module github.com/jatin-malik/yal
 
 go 1.23.3

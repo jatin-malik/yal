@@ -2,8 +2,8 @@ package evaluator
 
 import (
 	"fmt"
-	"github.com/jatin-malik/make-thy-interpreter/ast"
-	"github.com/jatin-malik/make-thy-interpreter/object"
+	"github.com/jatin-malik/yal/ast"
+	"github.com/jatin-malik/yal/object"
 )
 
 func Eval(node ast.Node, env *object.Environment) object.Object {

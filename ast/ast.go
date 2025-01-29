@@ -3,7 +3,7 @@ package ast
 import (
 	"bytes"
 	"fmt"
-	"github.com/jatin-malik/make-thy-interpreter/token"
+	"github.com/jatin-malik/yal/token"
 )
 
 type Node interface {

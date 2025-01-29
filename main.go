@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/jatin-malik/make-thy-interpreter/interpreter"
-	"github.com/jatin-malik/make-thy-interpreter/repl"
+	"github.com/jatin-malik/yal/interpreter"
+	"github.com/jatin-malik/yal/repl"
 	"os"
 	"os/user"
 )

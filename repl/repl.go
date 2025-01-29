@@ -3,13 +3,13 @@ package repl
 
 import (
 	"bufio"
-	"github.com/jatin-malik/make-thy-interpreter/evaluator"
-	"github.com/jatin-malik/make-thy-interpreter/object"
-	"github.com/jatin-malik/make-thy-interpreter/parser"
+	"github.com/jatin-malik/yal/evaluator"
+	"github.com/jatin-malik/yal/object"
+	"github.com/jatin-malik/yal/parser"
 	"io"
 	"strings"
 
-	"github.com/jatin-malik/make-thy-interpreter/lexer"
+	"github.com/jatin-malik/yal/lexer"
 )
 
 func Start(in io.Reader, out io.Writer) {
