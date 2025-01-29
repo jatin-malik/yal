@@ -1,2 +1,1 @@
-# make-thy-interpreter
-An interpreter for a simple language.
+Yet another language.
