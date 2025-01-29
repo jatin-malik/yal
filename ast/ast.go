@@ -2,6 +2,7 @@ package ast
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/jatin-malik/make-thy-interpreter/token"
 )
 
@@ -95,6 +96,21 @@ func (il IntegerLiteral) String() string {
 
 func (il IntegerLiteral) TokenLiteral() string {
 	return il.Token.Literal
+}
+
+type StringLiteral struct {
+	Token token.Token
+	Value string
+}
+
+func (sl StringLiteral) expressionBehaviour() {}
+
+func (sl StringLiteral) String() string {
+	return fmt.Sprintf("\"%s\"", sl.Value)
+}
+
+func (sl StringLiteral) TokenLiteral() string {
+	return sl.Token.Literal
 }
 
 type BooleanLiteral struct {
@@ -212,6 +228,30 @@ func (ie InfixExpression) TokenLiteral() string {
 	return ie.Token.Literal
 }
 
+type ArrayLiteral struct {
+	Token    token.Token
+	Elements []Expression
+}
+
+func (all ArrayLiteral) expressionBehaviour() {}
+func (all ArrayLiteral) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("[")
+	for i, element := range all.Elements {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(element.String())
+
+	}
+	buf.WriteString("]")
+	return buf.String()
+}
+
+func (all ArrayLiteral) TokenLiteral() string {
+	return all.Token.Literal
+}
+
 type CallExpression struct {
 	Token     token.Token
 	Function  Expression
@@ -239,6 +279,27 @@ func (ce CallExpression) String() string {
 
 func (ce CallExpression) TokenLiteral() string {
 	return ce.Token.Literal
+}
+
+type IndexExpression struct {
+	Token token.Token
+	Left  Expression
+	Index Expression
+}
+
+func (ie IndexExpression) expressionBehaviour() {}
+
+func (ie IndexExpression) String() string {
+	var buf bytes.Buffer
+	buf.WriteString(ie.Left.String())
+	buf.WriteString("[")
+	buf.WriteString(ie.Index.String())
+	buf.WriteString("]")
+	return buf.String()
+}
+
+func (ie IndexExpression) TokenLiteral() string {
+	return ie.Token.Literal
 }
 
 type Identifier struct {

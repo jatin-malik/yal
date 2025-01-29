@@ -15,6 +15,8 @@ const (
 	LT        TokenType = "<"
 	GT        TokenType = ">"
 	LPAREN    TokenType = "("
+	LBRACKET  TokenType = "["
+	RBRACKET  TokenType = "]"
 	RPAREN    TokenType = ")"
 	LBRACE    TokenType = "{"
 	RBRACE    TokenType = "}"
@@ -26,6 +28,7 @@ const (
 	// Keywords
 	LET      TokenType = "LET"
 	INT      TokenType = "INT"
+	STRING   TokenType = "STRING"
 	FUNCTION TokenType = "FUNCTION"
 	IF       TokenType = "IF"
 	ELSE     TokenType = "ELSE"

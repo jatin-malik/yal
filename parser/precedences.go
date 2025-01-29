@@ -10,6 +10,7 @@ const (
 	SumPrecedence
 	AsteriskPrecedence
 	CallPrecedence
+	IndexPrecedence
 )
 
 var precedenceByToken = map[token.TokenType]int{
@@ -22,6 +23,7 @@ var precedenceByToken = map[token.TokenType]int{
 	token.LT:       LtPrecedence,
 	token.GT:       LtPrecedence,
 	token.LPAREN:   CallPrecedence,
+	token.LBRACKET: IndexPrecedence,
 }
 
 func getTokenPrecedence(tokenType token.TokenType) int {

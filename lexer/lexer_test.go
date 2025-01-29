@@ -56,7 +56,10 @@ func TestLexer(t *testing.T) {
 				return false
 			}
 			5==5
-			5!=10`
+			5!=10
+			"hello"
+			"hello world"
+			[100,"hello",true]`
 
 		l := lexer.New(input)
 
@@ -128,6 +131,15 @@ func TestLexer(t *testing.T) {
 			{token.INT, "5"},
 			{token.NEQ, "!="},
 			{token.INT, "10"},
+			{token.STRING, "hello"},
+			{token.STRING, "hello world"},
+			{token.LBRACKET, "["},
+			{token.INT, "100"},
+			{token.COMMA, ","},
+			{token.STRING, "hello"},
+			{token.COMMA, ","},
+			{token.TRUE, "true"},
+			{token.RBRACKET, "]"},
 			{token.EOF, string(byte(0))},
 		}
 

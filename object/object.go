@@ -16,6 +16,8 @@ const (
 	ReturnValueObject ObjectType = "RETURN_VALUE"
 	ErrorValueObject  ObjectType = "ERROR"
 	FunctionObject    ObjectType = "FUNCTION"
+	StringObject      ObjectType = "STRING"
+	ArrayObject       ObjectType = "ARRAY"
 )
 
 var (
@@ -41,6 +43,18 @@ func (integer *Integer) Inspect() string {
 	return fmt.Sprintf("%d", integer.Value)
 }
 
+type String struct {
+	Value string
+}
+
+func (string *String) Type() ObjectType {
+	return StringObject
+}
+
+func (string *String) Inspect() string {
+	return fmt.Sprintf("\"%s\"", string.Value)
+}
+
 type Boolean struct {
 	Value bool
 }
@@ -51,6 +65,26 @@ func (boolean *Boolean) Type() ObjectType {
 
 func (boolean *Boolean) Inspect() string {
 	return fmt.Sprintf("%t", boolean.Value)
+}
+
+type Array struct {
+	Elements []Object
+}
+
+func (array *Array) Type() ObjectType {
+	return ArrayObject
+}
+
+func (array *Array) Inspect() string {
+	var out bytes.Buffer
+	var elements []string
+	for _, e := range array.Elements {
+		elements = append(elements, e.Inspect())
+	}
+	out.WriteString("[")
+	out.WriteString(strings.Join(elements, ", "))
+	out.WriteString("]")
+	return out.String()
 }
 
 type Function struct {
@@ -129,6 +163,8 @@ func (env *Environment) Get(name string) Object {
 	} else {
 		if env.outer != nil {
 			return env.outer.Get(name)
+		} else if fn, ok := builtinFunctions[name]; ok {
+			return fn
 		} else {
 			msg := fmt.Sprintf("Undefined variable %q", name)
 			return NewError(msg)

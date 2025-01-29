@@ -19,31 +19,35 @@ func TestLetStatement(t *testing.T) {
 		{"let y = !x;", "y", "( !x )"},
 		{"let x = 5+1;", "x", "( 5 + 1 )"},
 		{"let x = a+b;", "x", "( a + b )"},
+		{`let name = "elliot";`, "name", `"elliot"`},
+		{`let name = "";`, "name", `""`},
 	}
 
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		parser := New(l)
+		t.Run(tt.input, func(t *testing.T) {
+			l := lexer.New(tt.input)
+			parser := New(l)
 
-		program := parser.ParseProgram()
+			program := parser.ParseProgram()
 
-		checkParserErrors(parser, t, tt.input)
+			checkParserErrors(parser, t, tt.input)
 
-		if len(program.Statements) != 1 {
-			t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
-		}
-
-		if stmt, ok := program.Statements[0].(*ast.LetStatement); !ok {
-			t.Error("expected a let statement")
-		} else {
-			if stmt.Name.Value != tt.expectedName {
-				t.Errorf("expected identifier name = %s, got %s", tt.expectedName, stmt.Name.Value)
+			if len(program.Statements) != 1 {
+				t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
 			}
 
-			if stmt.Right.String() != tt.expectedExpressionString {
-				t.Errorf("expected right expression = %s, got %s", tt.expectedExpressionString, stmt.Right.String())
+			if stmt, ok := program.Statements[0].(*ast.LetStatement); !ok {
+				t.Error("expected a let statement")
+			} else {
+				if stmt.Name.Value != tt.expectedName {
+					t.Errorf("expected identifier name = %s, got %s", tt.expectedName, stmt.Name.Value)
+				}
+
+				if stmt.Right.String() != tt.expectedExpressionString {
+					t.Errorf("expected right expression = %s, got %s", tt.expectedExpressionString, stmt.Right.String())
+				}
 			}
-		}
+		})
 	}
 
 }
@@ -59,27 +63,30 @@ func TestReturnStatement(t *testing.T) {
 		{"return -result;", "( -result )"},
 		{"return !result;", "( !result )"},
 		{"return 5+3;", "( 5 + 3 )"},
+		{`return "abracadbra";`, `"abracadbra"`},
 	}
 
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		parser := New(l)
+		t.Run(tt.input, func(t *testing.T) {
+			l := lexer.New(tt.input)
+			parser := New(l)
 
-		program := parser.ParseProgram()
+			program := parser.ParseProgram()
 
-		checkParserErrors(parser, t, tt.input)
+			checkParserErrors(parser, t, tt.input)
 
-		if len(program.Statements) != 1 {
-			t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
-		}
-
-		if stmt, ok := program.Statements[0].(*ast.ReturnStatement); !ok {
-			t.Error("expected a return statement")
-		} else {
-			if stmt.Value.String() != tt.expectedExpressionString {
-				t.Errorf("expected right expression = %s, got %s", tt.expectedExpressionString, stmt.Value.String())
+			if len(program.Statements) != 1 {
+				t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
 			}
-		}
+
+			if stmt, ok := program.Statements[0].(*ast.ReturnStatement); !ok {
+				t.Error("expected a return statement")
+			} else {
+				if stmt.Value.String() != tt.expectedExpressionString {
+					t.Errorf("expected right expression = %s, got %s", tt.expectedExpressionString, stmt.Value.String())
+				}
+			}
+		})
 	}
 
 }
@@ -139,27 +146,31 @@ func TestExpressionParsing(t *testing.T) {
 		// Multiple Spaces and Indentation (if parser is space-sensitive)
 		{"  5  +  3  ", "( 5 + 3 )"},
 		{" ( 1 + 2 ) *   ( 3 + 4 ) ", "( ( 1 + 2 ) * ( 3 + 4 ) )"},
+		{`"hello"`, `"hello"`},
+		{`"hello world"`, `"hello world"`},
 	}
 
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		parser := New(l)
+		t.Run(tt.input, func(t *testing.T) {
+			l := lexer.New(tt.input)
+			parser := New(l)
 
-		program := parser.ParseProgram()
+			program := parser.ParseProgram()
 
-		checkParserErrors(parser, t, tt.input)
+			checkParserErrors(parser, t, tt.input)
 
-		if len(program.Statements) != 1 {
-			t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
-		}
-
-		if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
-			t.Error("expected an expression statement")
-		} else {
-			if stmt.String() != tt.expectedExpressionString {
-				t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+			if len(program.Statements) != 1 {
+				t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
 			}
-		}
+
+			if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
+				t.Error("expected an expression statement")
+			} else {
+				if stmt.String() != tt.expectedExpressionString {
+					t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+				}
+			}
+		})
 	}
 
 }
@@ -218,6 +229,79 @@ func TestFunctionLiteralParsing(t *testing.T) {
 				t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
 			}
 		}
+	}
+
+}
+
+func TestArrayLiteralParsing(t *testing.T) {
+	tests := []struct {
+		input                    string
+		expectedExpressionString string
+	}{
+		// ================================
+		// Basic Arrays
+		// ================================
+		{`["hello", 1, true]`, `["hello", 1, true]`},
+		{`[]`, `[]`},
+		{`[5]`, `[5]`},
+		{`["only"]`, `["only"]`},
+		{`[false]`, `[false]`},
+
+		// ================================
+		// Nested Arrays
+		// ================================
+		{`[[1, 2], [3, 4]]`, `[[1, 2], [3, 4]]`},
+		{`[["a", "b"], ["c", "d"]]`, `[["a", "b"], ["c", "d"]]`},
+		{`[[1, "two"], [3, "four"]]`, `[[1, "two"], [3, "four"]]`},
+		{`[[]]`, `[[]]`},
+		{`[[1, "hello"], [true, 42]]`, `[[1, "hello"], [true, 42]]`},
+
+		// ================================
+		// Array Index Expressions
+		// ================================
+		// Accessing elements using index notation
+		{`["hello", 1, true][0]`, `["hello", 1, true][0]`}, // Access the first element (hello)
+		{`["hello", 1, true][1]`, `["hello", 1, true][1]`}, // Access the second element (1)
+		{`["hello", 1, true][2]`, `["hello", 1, true][2]`}, // Access the third element (true)
+
+		// Accessing out-of-bounds (should result in null or similar)
+		{`["hello", 1, true][3]`, `["hello", 1, true][3]`}, // Out of bounds access
+
+		// ================================
+		// Nested Array Index Expressions
+		// ================================
+		// Accessing elements in nested arrays using index notation
+		{`[[1, 2], [3, 4]][0][0]`, `[[1, 2], [3, 4]][0][0]`}, // Access first element of first nested array (1)
+		{`[[1, 2], [3, 4]][0][1]`, `[[1, 2], [3, 4]][0][1]`}, // Access second element of first nested array (2)
+		{`[[1, 2], [3, 4]][1][0]`, `[[1, 2], [3, 4]][1][0]`}, // Access first element of second nested array (3)
+		{`[[1, 2], [3, 4]][1][1]`, `[[1, 2], [3, 4]][1][1]`}, // Access second element of second nested array (4)
+
+		// Accessing out-of-bounds nested arrays
+		{`[[1, 2], [3, 4]][2]`, `[[1, 2], [3, 4]][2]`},       // Out of bounds (null)
+		{`[[1, 2], [3, 4]][0][2]`, `[[1, 2], [3, 4]][0][2]`}, // Out of bounds in a nested array (null)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			l := lexer.New(tt.input)
+			parser := New(l)
+
+			program := parser.ParseProgram()
+
+			checkParserErrors(parser, t, tt.input)
+
+			if len(program.Statements) != 1 {
+				t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
+			}
+
+			if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
+				t.Error("expected an expression statement")
+			} else {
+				if stmt.String() != tt.expectedExpressionString {
+					t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+				}
+			}
+		})
 	}
 
 }
@@ -320,7 +404,7 @@ func TestCallExpressionParsing(t *testing.T) {
 		// ================================
 		// Edge case: Function with no arguments
 		// ================================
-		{"noop()", "noop()"},
+		{"noop() + noop()", "( noop() + noop() )"},
 
 		// ================================
 		// Edge case: Function with many arguments
@@ -340,24 +424,27 @@ func TestCallExpressionParsing(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		l := lexer.New(tt.input)
-		parser := New(l)
+		t.Run(tt.input, func(t *testing.T) {
+			l := lexer.New(tt.input)
+			parser := New(l)
 
-		program := parser.ParseProgram()
+			program := parser.ParseProgram()
 
-		checkParserErrors(parser, t, tt.input)
+			checkParserErrors(parser, t, tt.input)
 
-		if len(program.Statements) != 1 {
-			t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
-		}
-
-		if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
-			t.Error("expected an expression statement")
-		} else {
-			if stmt.String() != tt.expectedExpressionString {
-				t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+			if len(program.Statements) != 1 {
+				t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
 			}
-		}
+
+			if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
+				t.Error("expected an expression statement")
+			} else {
+				if stmt.String() != tt.expectedExpressionString {
+					t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+				}
+			}
+		})
+
 	}
 
 }

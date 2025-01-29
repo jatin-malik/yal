@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"errors"
 	"fmt"
 	"github.com/jatin-malik/make-thy-interpreter/lexer"
 	"github.com/jatin-malik/make-thy-interpreter/object"
@@ -119,6 +120,16 @@ func TestEvalComparisonInfixExpression(t *testing.T) {
 		{"true==true", true},
 		{"false==false", true},
 		{"true==false", false},
+		{"\"apple\"==\"apple\"", true},             // Simple equal strings
+		{"\"apple\"==\"banana\"", false},           // Different strings
+		{"\"hello\"==\"hello\"", true},             // Equal strings with exact same value
+		{"\"Hello\"==\"hello\"", false},            // Case-sensitive check (should fail)
+		{"\"abc\"==\"abcd\"", false},               // String of different lengths
+		{"\"true\"==\"true\"", true},               // Strings with boolean values as strings
+		{"\"a\"==\"A\"", false},                    // Case-sensitive comparison
+		{"\"123\"==\"123\"", true},                 // Numeric strings (equal)
+		{"\"\"==\"\"", true},                       // Empty string comparison
+		{"\"hello world\"==\"hello world\"", true}, // Long string comparison
 
 		// ================================
 		// Not Equal (!=)
@@ -130,6 +141,15 @@ func TestEvalComparisonInfixExpression(t *testing.T) {
 		{"true!=true", false},
 		{"false!=false", false},
 		{"true!=false", true},
+		{"\"apple\"!=\"apple\"", false},  // Identical strings (should not be unequal)
+		{"\"apple\"!=\"banana\"", true},  // Different strings
+		{"\"hello\"!=\"hello\"", false},  // Identical strings
+		{"\"Hello\"!=\"hello\"", true},   // Case-sensitive check (should be unequal)
+		{"\"abc\"!=\"abcd\"", true},      // Strings of different lengths
+		{"\"true\"!=\"false\"", true},    // Different strings
+		{"\"123\"!=\"1234\"", true},      // Numeric strings (unequal)
+		{"\"\"!=\"hello\"", true},        // Empty string compared to non-empty
+		{"\"goodbye\"!=\"hello\"", true}, // Completely different strings
 
 		// ================================
 		// Less Than (<)
@@ -184,7 +204,29 @@ func TestEvalIfElseConditional(t *testing.T) {
 		{`if (5 == 5) { if (2 > 1) { 15 } else { 0 } } else { 100 }`, 15},
 		{`if (false) { 5 } else { 0 }`, 0},
 		{`if (2) { 5 } else { 0 }`, 5},
-		{`if (2==1) { 5 }`, "null"},
+		{`if (2==1) { 5 }`, nil},
+
+		// ================================
+		// Basic if-else conditions with strings
+		// ================================
+		{`if ("hello" == "hello") { "equal" } else { "not equal" }`, "equal"},      // String equality
+		{`if ("apple" == "banana") { "equal" } else { "not equal" }`, "not equal"}, // String inequality
+		{`if ("cat" != "dog") { "different" } else { "same" }`, "different"},       // String inequality
+
+		// ================================
+		// if with nested conditions using strings
+		// ================================
+		{`if ("apple" == "apple") { if ("hello" == "hello") { "both equal" } else { "second not equal" } } else { "first not equal" }`, "both equal"}, // Nested string comparison (true in both)
+		{`if ("apple" != "banana") { if ("cat" == "dog") { "nested true" } else { "nested false" } } else { "first false" }`, "nested false"},         // Nested false condition with strings
+
+		// ================================
+		// Handling strings with boolean or null results
+		// ================================
+		{`if ("hello" == "world") { "yes" }`, nil},                                                // False condition with no else branch (expected null)
+		{`if ("apple" == "apple") { "yes" } else { "no" }`, "yes"},                                // True condition with else
+		{`if ("orange" == "apple") { "same" } else { "different" }`, "different"},                 // String inequality with else
+		{`if (false) { "not executed" } else { "else branch executed" }`, "else branch executed"}, // False condition
+
 	}
 
 	for _, tt := range tests {
@@ -192,6 +234,8 @@ func TestEvalIfElseConditional(t *testing.T) {
 			obj := testEval(tt.input)
 			if i, ok := tt.expected.(int); ok {
 				testIntegerObject(t, obj, int64(i))
+			} else if i, ok := tt.expected.(string); ok {
+				testStringObject(t, obj, i)
 			} else {
 				testNullObject(t, obj)
 			}
@@ -207,8 +251,9 @@ func TestEvalVariableBinding(t *testing.T) {
 		// ================================
 		// Basic variable binding
 		// ================================
-		{`let a = 5; a;`, 5},   // simple binding, should return 5
-		{`let b = 10; b;`, 10}, // simple binding, should return 10
+		{`let a = 5; a;`, 5},               // simple binding, should return 5
+		{`let b = 10; b;`, 10},             // simple binding, should return 10
+		{`let b = "elliot"; b;`, "elliot"}, // simple binding, should return 10
 
 		// ================================
 		// Variable binding with expressions
@@ -243,6 +288,8 @@ func TestEvalVariableBinding(t *testing.T) {
 			obj := testEval(tt.input)
 			if i, ok := tt.expected.(int); ok {
 				testIntegerObject(t, obj, int64(i))
+			} else if i, ok := tt.expected.(string); ok {
+				testStringObject(t, obj, i)
 			}
 		})
 	}
@@ -256,9 +303,9 @@ func TestEvalReturnStatements(t *testing.T) {
 		// ================================
 		// Basic return statement
 		// ================================
-		{`let a = 10; return a; 5`, 10},   // should return 10 (first return is evaluated)
-		{`return 42; 100`, 42},            // should return 42, second part is ignored
-		{`let x = 20; return x + 5;`, 25}, // return evaluates an expression, should return 25
+		{`let a = "elliot"; return a; 5`, "elliot"}, // should return 10 (first return is evaluated)
+		{`return 42; 100`, 42},                      // should return 42, second part is ignored
+		{`let x = 20; return x + 5;`, 25},           // return evaluates an expression, should return 25
 
 		// ================================
 		// Multiple return statements
@@ -309,7 +356,7 @@ func TestEvalFunctions(t *testing.T) {
 		// ================================
 		{`let add = fn(x, y) { x + y }; add(2, 3);`, 5},                    // simple addition function
 		{`let multiply = fn(x, y) { x * y }; multiply(4, 5);`, 20},         // simple multiplication function
-		{`fn(x) { return x; }(5);`, 5},                                     // direct function invocation
+		{`fn(x) { return x; }("elliot");`, "elliot"},                       // direct function invocation
 		{`let subtract = fn(x, y) { return x - y; }; subtract(10, 3);`, 7}, // function with subtraction
 
 		// ================================
@@ -370,6 +417,417 @@ func TestEvalFunctions(t *testing.T) {
 	}
 }
 
+func TestEvalArrays(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Basic Array Creation
+		// ================================
+		{`[1, 2, 3]`, []interface{}{int64(1), int64(2), int64(3)}}, // Array with integers
+		{`["a", "b", "c"]`, []interface{}{"a", "b", "c"}},          // Array with strings
+
+		// ================================
+		// Empty Array
+		// ================================
+		{`[]`, []interface{}{}}, // Empty array
+
+		// ================================
+		// Array Access (Indexing)
+		// ================================
+		{`[1, 2, 3][0]`, int64(1)}, // Access first element
+		{`[1, 2, 3][1]`, int64(2)}, // Access second element
+		{`[1, 2, 3][2]`, int64(3)}, // Access third element
+		{`[1, 2, 3][3]`, errors.New("index out of bounds for arr length 3")}, // Access out of bounds (null)
+
+		{`[[1, 2], [3, 4]][0][1]`, int64(2)}, // Access second element of the first nested array
+
+		// ================================
+		// Array with Mixed Types
+		// ================================
+		{`[1, "a", true]`, []interface{}{int64(1), "a", true}}, // Mixed types in the array
+		{`[1, "a", true][1]`, "a"},                             // Access string element
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+
+			switch expected := tt.expected.(type) {
+			case int64:
+				testIntegerObject(t, obj, expected)
+			case bool:
+				testBooleanObject(t, obj, expected)
+			case string:
+				testStringObject(t, obj, expected)
+			case error:
+				testErrorObject(t, obj, expected.Error())
+			case []interface{}:
+				testArrayObject(t, obj, expected)
+			}
+		})
+	}
+}
+
+func TestEvalStringConcatenation(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		// ================================
+		// Basic Concatenation
+		// ================================
+		{`"Hello" + " " + "World"`, "Hello World"}, // Basic string concatenation
+		{`"foo" + "bar"`, "foobar"},                // Simple concatenation of two strings
+		{`"apple" + "pie"`, "applepie"},            // Simple concatenation of two words
+		{`"a" + "b" + "c"`, "abc"},                 // Concatenation of multiple single characters
+
+		// ================================
+		// Concatenation with variables (string variables)
+		// ================================
+		{`let greeting = "Hello"; let name = "Alice"; greeting + " " + name`, "Hello Alice"},   // Using variables in concatenation
+		{`let part_a = "Good"; let part_b = "Morning"; part_a + " " + part_b`, "Good Morning"}, // Concatenating variables holding strings
+
+		// ================================
+		// Concatenation with empty strings
+		// ================================
+		{`"" + "test"`, "test"}, // Empty string and a non-empty string
+		{`"test" + ""`, "test"}, // Non-empty string and an empty string
+		{`"" + ""`, ""},         // Concatenation of two empty strings
+
+		// ================================
+		// Concatenation with large strings
+		// ================================
+		{`"a" + "b" + "c" + "d" + "e" + "f" + "g" + "h" + "i" + "j"`, "abcdefghij"}, // Concatenating many characters
+		{`"Lorem ipsum dolor sit amet, consectetur adipiscing elit. " + "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."`,
+			"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."}, // Long string concatenation
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			testStringObject(t, obj, tt.expected)
+		})
+	}
+}
+
+func TestEvalBuiltInFuncLen(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int
+	}{
+		// ================================
+		// Basic String Length
+		// ================================
+		{`len("hello")`, 5}, // Basic string length
+		{`len("world")`, 5}, // Another basic string length
+		{`len("a")`, 1},     // Length of a single character
+		{`len("")`, 0},      // Length of an empty string
+
+		// ================================
+		// Arrays (or lists)
+		// ================================
+		{`len([1, 2, 3, 4])`, 4},  // Length of an array (or list) of integers
+		{`len([10, 20, 30])`, 3},  // Another array length
+		{`len([true, false])`, 2}, // Array with boolean values
+		{`len([])`, 0},            // Empty array
+
+		// ================================
+		// Mixed Types (if supported)
+		// ================================
+		{`len([1, "a", true])`, 3},        // Mixed array with number, string, and boolean
+		{`len([true, "string", 100])`, 3}, // Mixed array with booleans, string, and number
+
+		// ================================
+		// Nested Arrays
+		// ================================
+		{`len([ [1, 2], [3, 4] ])`, 2},            // Nested arrays (should count top level)
+		{`len([ [1, 2, 3], [4, 5] ])`, 2},         // Nested arrays with varying lengths
+		{`len([["a", "b"], ["c", "d", "e"]])`, 2}, // Nested arrays with mixed sizes
+
+		// ================================
+		// Concatenation with Length
+		// ================================
+		{`len("hello" + " world")`, 11},  // Length of concatenated string
+		{`len("good" + "bye" + "!")`, 8}, // Length of concatenated string with multiple parts
+		{`len("a" + "b" + "c")`, 3},      // Length of concatenation of multiple characters
+
+		// ================================
+		// Other Edge Cases
+		// ================================
+		{`len("a" + "")`, 1},         // Concatenation with an empty string
+		{`len("") + len("test")`, 4}, // Adding lengths of two strings
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			testIntegerObject(t, obj, int64(tt.expected))
+		})
+	}
+}
+
+func TestEvalBuiltInFuncFirst(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Valid Arrays (Non-Empty)
+		// ================================
+		{`first([1, 2, 3])`, int64(1)},           // First element of the array is an integer
+		{`first(["hello", "world"])`, "hello"},   // First element of the array is a string
+		{`first([true, false])`, true},           // First element of the array is a boolean
+		{`first([1, "hello", false])`, int64(1)}, // Mixed array, first element is integer
+
+		// ================================
+		// Edge Cases (Empty Arrays)
+		// ================================
+		{`first([])`, errors.New("empty array")}, // Empty array, should return null
+
+		// ================================
+		// Single Element Arrays
+		// ================================
+		{`first([42])`, int64(42)},  // Single integer in array
+		{`first(["only"])`, "only"}, // Single string in array
+		{`first([false])`, false},   // Single boolean in array
+
+		// ================================
+		// Nested Arrays
+		// ================================
+		{`first([[1, 2], [3, 4]])`, []interface{}{int64(1), int64(2)}}, // First element is an array
+		{`first([["a", "b"], ["c", "d"]])`, []interface{}{"a", "b"}},   // First element is a string array
+
+		// ================================
+		// Mixed Arrays with Nested Elements
+		// ================================
+		{`first([1, [2, 3], "hello"])`, int64(1)}, // First element is a number
+		{`first([true, [false, true]])`, true},    // First element is a boolean
+
+		// ================================
+		// Invalid Cases (non-array arguments)
+		// ================================
+		{`first("hello")`, errors.New("first(): type STRING not supported")},
+		{`first(42)`, errors.New("first(): type INTEGER not supported")},
+		{`first(true)`, errors.New("first(): type BOOLEAN not supported")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+
+			switch expected := tt.expected.(type) {
+			case int64:
+				testIntegerObject(t, obj, expected)
+			case string:
+				testStringObject(t, obj, expected)
+			case bool:
+				testBooleanObject(t, obj, expected)
+			case []interface{}:
+				// Check for nested arrays
+				testArrayObject(t, obj, expected)
+			case error:
+				testErrorObject(t, obj, expected.Error())
+			default:
+				t.Errorf("unexpected type for expected value: %T", expected)
+			}
+		})
+	}
+}
+
+func TestEvalBuiltInFuncLast(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Valid Arrays (Non-Empty)
+		// ================================
+		{`last([1, 2, 3])`, int64(3)},         // Last element of the array is an integer
+		{`last(["hello", "world"])`, "world"}, // Last element of the array is a string
+		{`last([true, false])`, false},        // Last element of the array is a boolean
+		{`last([1, "hello", false])`, false},  // Mixed array, last element is a boolean
+
+		// ================================
+		// Edge Cases (Empty Arrays)
+		// ================================
+		{`last([])`, errors.New("empty array")}, // Empty array, should return an error
+
+		// ================================
+		// Single Element Arrays
+		// ================================
+		{`last([42])`, int64(42)},  // Single integer in array
+		{`last(["only"])`, "only"}, // Single string in array
+		{`last([false])`, false},   // Single boolean in array
+
+		// ================================
+		// Nested Arrays
+		// ================================
+		{`last([[1, 2], [3, 4]])`, []interface{}{int64(3), int64(4)}}, // Last element is an array
+		{`last([["a", "b"], ["c", "d"]])`, []interface{}{"c", "d"}},   // Last element is a string array
+
+		// ================================
+		// Mixed Arrays with Nested Elements
+		// ================================
+		{`last([1, [2, 3], "hello"])`, "hello"},                     // Last element is a string
+		{`last([true, [false, true]])`, []interface{}{false, true}}, // Last element is a nested array
+
+		// ================================
+		// Invalid Cases (non-array arguments)
+		// ================================
+		{`last("hello")`, errors.New("last(): type STRING not supported")}, // Invalid, not an array
+		{`last(42)`, errors.New("last(): type INTEGER not supported")},     // Invalid, not an array
+		{`last(true)`, errors.New("last(): type BOOLEAN not supported")},   // Invalid, not an array
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			switch expected := tt.expected.(type) {
+			case int64:
+				testIntegerObject(t, obj, expected)
+			case string:
+				testStringObject(t, obj, expected)
+			case bool:
+				testBooleanObject(t, obj, expected)
+			case []interface{}:
+				// Check for nested arrays
+				testArrayObject(t, obj, expected)
+			case error:
+				testErrorObject(t, obj, expected.Error())
+			default:
+				t.Errorf("unexpected type for expected value: %T", expected)
+			}
+		})
+	}
+}
+
+func TestEvalBuiltInFuncRest(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Valid Arrays (Non-Empty)
+		// ================================
+		{`rest([1, 2, 3])`, []interface{}{int64(2), int64(3)}},             // Rest of the array excluding the first element
+		{`rest(["hello", "world", "foo"])`, []interface{}{"world", "foo"}}, // Rest of the array with strings
+		{`rest([true, false, true])`, []interface{}{false, true}},          // Rest of the array with booleans
+		{`rest([1, "hello", false])`, []interface{}{"hello", false}},       // Mixed array, excluding the first element
+
+		// ================================
+		// Edge Cases (Empty Arrays)
+		// ================================
+		{`rest([])`, errors.New("empty array")}, // Empty array, should return an error or "null"
+
+		// ================================
+		// Single Element Arrays
+		// ================================
+		{`rest([42])`, []interface{}{}},     // Single element array, result is an empty array
+		{`rest(["only"])`, []interface{}{}}, // Single string element, result is an empty array
+		{`rest([false])`, []interface{}{}},  // Single boolean element, result is an empty array
+
+		// ================================
+		// Nested Arrays
+		// ================================
+		{`rest([[1, 2], [3, 4], [5, 6]])`, []interface{}{[]interface{}{int64(3), int64(4)}, []interface{}{int64(5), int64(6)}}}, // Nested arrays, excluding first
+		{`rest([["a", "b"], ["c", "d"], ["e", "f"]])`, []interface{}{[]interface{}{"c", "d"}, []interface{}{"e", "f"}}},         // Nested arrays with strings
+
+		// ================================
+		// Mixed Arrays with Nested Elements
+		// ================================
+		{`rest([1, [2, 3], "hello", true])`, []interface{}{[]interface{}{int64(2), int64(3)}, "hello", true}}, // Mixed array with a nested array and others
+		{`rest([true, [false, true], 42])`, []interface{}{[]interface{}{false, true}, int64(42)}},             // Boolean and nested array mixed
+
+		// ================================
+		// Invalid Cases (non-array arguments)
+		// ================================
+		{`rest("hello")`, errors.New("rest(): type STRING not supported")}, // Invalid, not an array
+		{`rest(42)`, errors.New("rest(): type INTEGER not supported")},     // Invalid, not an array
+		{`rest(true)`, errors.New("rest(): type BOOLEAN not supported")},   // Invalid, not an array
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+
+			switch expected := tt.expected.(type) {
+			case []interface{}:
+				testArrayObject(t, obj, expected)
+			case error:
+				testErrorObject(t, obj, expected.Error())
+			default:
+				t.Errorf("unexpected type for expected value: %T", expected)
+			}
+		})
+	}
+}
+
+func TestEvalBuiltInFuncPush(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ================================
+		// Valid Arrays (Non-Empty)
+		// ================================
+		{`push([1, 2], 3)`, []interface{}{int64(1), int64(2), int64(3)}},                        // Add an integer to the end
+		{`push(["hello", "world"], "test")`, []interface{}{"hello", "world", "test"}},           // Add a string
+		{`push([true, false], true)`, []interface{}{true, false, true}},                         // Add a boolean
+		{`push([1, "hello", false], 100)`, []interface{}{int64(1), "hello", false, int64(100)}}, // Mixed types
+
+		// ================================
+		// Edge Cases (Empty Arrays)
+		// ================================
+		{`push([], 42)`, []interface{}{int64(42)}}, // Adding to an empty array
+
+		// ================================
+		// Single Element Arrays
+		// ================================
+		{`push([42], 100)`, []interface{}{int64(42), int64(100)}}, // Add to a single-element array
+		{`push(["only"], "more")`, []interface{}{"only", "more"}}, // Add to a single-element string array
+		{`push([false], true)`, []interface{}{false, true}},       // Add to a single-element boolean array
+
+		// ================================
+		// Nested Arrays
+		// ================================
+		{`push([[1, 2], [3, 4]], [5, 6])`, []interface{}{[]interface{}{int64(1), int64(2)}, []interface{}{int64(3), int64(4)}, []interface{}{int64(5), int64(6)}}}, // Add a nested array
+		{`push([["a", "b"], ["c", "d"]], ["e", "f"])`, []interface{}{[]interface{}{"a", "b"}, []interface{}{"c", "d"}, []interface{}{"e", "f"}}},                   // Add another nested array
+
+		// ================================
+		// Mixed Arrays with Nested Elements
+		// ================================
+		{`push([1, [2, 3], "hello"], [4, 5])`, []interface{}{int64(1), []interface{}{int64(2), int64(3)}, "hello", []interface{}{int64(4), int64(5)}}}, // Add nested array to mixed array
+		{`push([true, [false, true]], ["more"])`, []interface{}{true, []interface{}{false, true}, []interface{}{"more"}}},                              // Add a nested array of strings
+
+		// ================================
+		// Invalid Cases (non-array arguments)
+		// ================================
+		{`push("hello", 42)`, errors.New("push(): type STRING not supported")},  // Invalid, not an array
+		{`push(42, 100)`, errors.New("push(): type INTEGER not supported")},     // Invalid, not an array
+		{`push(true, false)`, errors.New("push(): type BOOLEAN not supported")}, // Invalid, not an array
+	}
+
+	// Running each test
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+
+			switch expected := tt.expected.(type) {
+			case []interface{}:
+
+				testArrayObject(t, obj, expected)
+			case error:
+
+				testErrorObject(t, obj, expected.Error())
+			default:
+				t.Errorf("unexpected type for expected value: %T", expected)
+			}
+		})
+	}
+}
+
 // TODO: Put these scenarios with their respective normal cases in other test functions.
 func TestEvalErrorHandling(t *testing.T) {
 	tests := []struct {
@@ -393,8 +851,8 @@ func TestEvalErrorHandling(t *testing.T) {
 		// Invalid Operations
 		// ================================
 		//{"return 'string' + 5;", "Runtime Error: Invalid operation between 'string' and 'number'."}, // invalid type operation
-		{"let a = true; let b = 10; return a + b;", "Incompatible types: BOOLEAN and INTEGER"}, // invalid type operation
-		//{"let a = 10; let b = 'hello'; return a - b;", "Runtime Error: Invalid operation between 'number' and 'string'."}, // invalid type operation
+		{"let a = true; let b = 10; return a + b;", "Incompatible types: BOOLEAN and INTEGER"},   // invalid type operation
+		{`let a = 10; let b = "hello"; return a - b;`, "Incompatible types: INTEGER and STRING"}, // invalid type operation
 		{"-true", "Invalid type BOOLEAN with operator '-'"},
 		{"!(true+2)", "Incompatible types: BOOLEAN and INTEGER"},
 
@@ -450,7 +908,18 @@ func testIntegerObject(t *testing.T, obj object.Object, expected int64) {
 			t.Errorf("expected %d, got %d", expected, i.Value)
 		}
 	} else {
-		t.Errorf("expected *object.Integer, got %s", obj)
+		t.Errorf("expected *object.Integer, got %s", obj.Inspect())
+
+	}
+}
+
+func testStringObject(t *testing.T, obj object.Object, expected string) {
+	if i, ok := obj.(*object.String); ok {
+		if i.Value != expected {
+			t.Errorf("expected %s, got %s", expected, i.Value)
+		}
+	} else {
+		t.Errorf("expected *object.String, got %s", obj)
 
 	}
 }
@@ -480,5 +949,33 @@ func testErrorObject(t *testing.T, obj object.Object, expectedError string) {
 	} else {
 		t.Errorf("expected *object.Error, got %T", obj)
 
+	}
+}
+
+// Helper function to test arrays
+func testArrayObject(t *testing.T, obj object.Object, expected []interface{}) {
+	arr, ok := obj.(*object.Array)
+	if !ok {
+		t.Errorf("expected an array, got %s", obj.Type())
+	}
+
+	if len(arr.Elements) != len(expected) {
+		t.Errorf("expected array of length %d, got %d", len(expected), len(arr.Elements))
+	}
+
+	// Iterate through the array elements and compare them to the expected values
+	for i, expectedElem := range expected {
+		switch expectedElem := expectedElem.(type) {
+		case int64:
+			testIntegerObject(t, arr.Elements[i], expectedElem)
+		case string:
+			testStringObject(t, arr.Elements[i], expectedElem)
+		case bool:
+			testBooleanObject(t, arr.Elements[i], expectedElem)
+		case []interface{}:
+			testArrayObject(t, arr.Elements[i], expectedElem) // Recursively check nested arrays
+		default:
+			t.Errorf("unsupported element type in array at index %d: %T", i, expectedElem)
+		}
 	}
 }

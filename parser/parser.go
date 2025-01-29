@@ -39,6 +39,8 @@ func New(lexer *lexer.Lexer) *Parser {
 	parser.registerPrefix(token.FALSE, parser.parseBooleanLiteral)
 	parser.registerPrefix(token.FUNCTION, parser.parseFunctionLiteral)
 	parser.registerPrefix(token.IF, parser.parseIfElseConditional)
+	parser.registerPrefix(token.STRING, parser.parseStringLiteral)
+	parser.registerPrefix(token.LBRACKET, parser.parseArrayLiteral)
 
 	// Infix parsers
 	parser.registerInfix(token.PLUS, parser.parseInfixExpression)
@@ -50,6 +52,7 @@ func New(lexer *lexer.Lexer) *Parser {
 	parser.registerInfix(token.LT, parser.parseInfixExpression)
 	parser.registerInfix(token.GT, parser.parseInfixExpression)
 	parser.registerInfix(token.LPAREN, parser.parseCallExpression)
+	parser.registerInfix(token.LBRACKET, parser.parseIndexExpression)
 
 	return parser
 }
@@ -167,6 +170,11 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 	return exp
 }
 
+func (p *Parser) parseStringLiteral() ast.Expression {
+	exp := &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+	return exp
+}
+
 func (p *Parser) parseBooleanLiteral() ast.Expression {
 	exp := &ast.BooleanLiteral{Token: p.curToken}
 	exp.Value = p.curToken.Literal == "true"
@@ -229,14 +237,11 @@ func (p *Parser) parseFunctionParams() []*ast.Identifier {
 	return identifiers
 }
 
-func (p *Parser) parseCallArguments() []ast.Expression {
-	if p.curToken.Type != token.LPAREN {
-		return nil
-	}
-
+// parseCommaSeparatedExpressions parses comma separated expressions and stops parsing when encounters endToken.
+func (p *Parser) parseCommaSeparatedExpressions(endToken token.TokenType) []ast.Expression {
 	p.Next()
 	var arguments []ast.Expression
-	for p.curToken.Type != token.RPAREN {
+	for p.curToken.Type != endToken {
 		arg := p.parseExpression(LowestPrecedence)
 		arguments = append(arguments, arg)
 		p.Next()
@@ -279,13 +284,17 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 		leftExp = prefixParser()
 	} else {
 		p.Errors = append(p.Errors, fmt.Sprintf("no prefix parsing function registered for %s", p.curToken))
+		return leftExp
 	}
 
-	if infixParser, exists := p.infixParsers[p.peekToken.Type]; exists {
-		for p.peekToken.Type != token.SEMICOLON && getTokenPrecedence(p.peekToken.Type) > precedence {
+	for p.peekToken.Type != token.SEMICOLON && getTokenPrecedence(p.peekToken.Type) > precedence {
+		if infixParser, exists := p.infixParsers[p.peekToken.Type]; !exists {
+			return leftExp
+		} else {
 			p.Next()
 			leftExp = infixParser(leftExp)
 		}
+
 	}
 
 	return leftExp
@@ -316,8 +325,29 @@ func (p *Parser) parseCallExpression(left ast.Expression) ast.Expression {
 		Token:    p.curToken,
 		Function: left,
 	}
-	ce.Arguments = p.parseCallArguments()
+	ce.Arguments = p.parseCommaSeparatedExpressions(token.RPAREN)
 	return ce
+}
+
+func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
+	ie := &ast.IndexExpression{
+		Token: p.curToken,
+		Left:  left,
+	}
+	p.Next()
+	ie.Index = p.parseExpression(LowestPrecedence)
+	if !p.expectPeek(token.RBRACKET) {
+		return nil
+	}
+	return ie
+}
+
+func (p *Parser) parseArrayLiteral() ast.Expression {
+	al := &ast.ArrayLiteral{
+		Token: p.curToken,
+	}
+	al.Elements = p.parseCommaSeparatedExpressions(token.RBRACKET)
+	return al
 }
 
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {

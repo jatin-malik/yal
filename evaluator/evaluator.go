@@ -36,8 +36,20 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		result = Eval(v.Expr, env)
 	case *ast.IntegerLiteral:
 		result = &object.Integer{Value: v.Value}
+	case *ast.StringLiteral:
+		result = &object.String{Value: v.Value}
 	case *ast.BooleanLiteral:
 		result = getBooleanObject(v.Value)
+	case *ast.ArrayLiteral:
+		var elems []object.Object
+		for _, elem := range v.Elements {
+			result = Eval(elem, env)
+			if isErrorValue(result) {
+				return result
+			}
+			elems = append(elems, result)
+		}
+		result = &object.Array{Elements: elems}
 	case *ast.FunctionLiteral:
 		result = &object.Function{
 			Env:        env,
@@ -60,6 +72,18 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 
 		result = evalCallExpression(fn, args)
+	case *ast.IndexExpression:
+		iterable := Eval(v.Left, env)
+		if isErrorValue(iterable) {
+			return iterable
+		}
+
+		idx := Eval(v.Index, env)
+		if isErrorValue(idx) {
+			return idx
+		}
+
+		result = evalIndexExpression(iterable, idx)
 
 	case *ast.PrefixExpression:
 		operandObject := Eval(v.Right, env)
@@ -156,13 +180,19 @@ func evalInfixExpression(operator string, left, right object.Object) object.Obje
 }
 
 func evalPlusInfixExpression(left, right object.Object) object.Object {
-	l, ok1 := left.(*object.Integer)
-	r, ok2 := right.(*object.Integer)
-	if ok1 && ok2 {
+	switch left.Type() {
+	case object.IntegerObject:
+		l := left.(*object.Integer)
+		r := right.(*object.Integer)
 		return &object.Integer{Value: l.Value + r.Value}
-	} else {
-		return object.NULL
+	case object.StringObject:
+		l := left.(*object.String)
+		r := right.(*object.String)
+		return &object.String{Value: l.Value + r.Value}
+	default:
+		return object.NewError(fmt.Sprintf("unsupported operand type %s with '+'", left.Type()))
 	}
+
 }
 
 func evalMinusInfixExpression(left, right object.Object) object.Object {
@@ -205,6 +235,8 @@ func evalEqualsInfixExpression(left, right object.Object) object.Object {
 	switch objType {
 	case object.IntegerObject:
 		return getBooleanObject(left.(*object.Integer).Value == right.(*object.Integer).Value)
+	case object.StringObject:
+		return getBooleanObject(left.(*object.String).Value == right.(*object.String).Value)
 	case object.BooleanObject:
 		return getBooleanObject(left == right) // no need to unwrap
 	default:
@@ -258,11 +290,9 @@ func evalBangPrefixExpression(right object.Object) object.Object {
 }
 
 func evalCallExpression(function object.Object, args []object.Object) object.Object {
-	if fn, ok := function.(*object.Function); !ok {
-		msg := fmt.Sprintf("expected *object.Function, got %s", function.Type())
-		return object.NewError(msg)
-	} else {
-
+	switch function.Type() {
+	case object.FunctionObject:
+		fn := function.(*object.Function)
 		// Extend the environment for this function evaluation
 		extendedEnv := object.NewEnvironment(fn.Env)
 
@@ -280,6 +310,39 @@ func evalCallExpression(function object.Object, args []object.Object) object.Obj
 			return result.(*object.ReturnValue).Value // unwrap
 		}
 		return result
+	case object.BuiltInFunctionObject:
+		fn := function.(*object.BuiltinFunction)
+		return fn.Fn(args...)
+	default:
+		msg := fmt.Sprintf("expected *object.Function, got %s", function.Type())
+		return object.NewError(msg)
+	}
+}
+
+func evalIndexExpression(iterable object.Object, index object.Object) object.Object {
+	switch iterable.Type() {
+	case object.ArrayObject:
+		return evalArrayIndexExpression(iterable, index)
+	default:
+		msg := fmt.Sprintf("index expression not supported for type: %s", iterable.Type())
+		return object.NewError(msg)
+	}
+}
+
+func evalArrayIndexExpression(iterable object.Object, index object.Object) object.Object {
+	arr := iterable.(*object.Array)
+
+	// The index has to be an integer
+	if i, ok := index.(*object.Integer); !ok {
+		return object.NewError(fmt.Sprintf("index must be an integer for index expression in arrays"))
+	} else {
+		// Check bounds of the index
+		idx := i.Value
+		if idx < 0 || idx >= int64(len(arr.Elements)) {
+			return object.NewError(fmt.Sprintf("index out of bounds for arr length %d", len(arr.Elements)))
+		}
+
+		return arr.Elements[idx]
 	}
 
 }

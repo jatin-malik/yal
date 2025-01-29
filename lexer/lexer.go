@@ -25,6 +25,9 @@ func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
 
 	switch ch {
+	case '"':
+		tok.Literal = l.readString()
+		tok.Type = token.STRING
 	case '+':
 		tok = newToken(token.PLUS, ch)
 	case '-':
@@ -59,6 +62,10 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.LPAREN, ch)
 	case ')':
 		tok = newToken(token.RPAREN, ch)
+	case '[':
+		tok = newToken(token.LBRACKET, ch)
+	case ']':
+		tok = newToken(token.RBRACKET, ch)
 	case '{':
 		tok = newToken(token.LBRACE, ch)
 	case '}':
@@ -113,6 +120,16 @@ func (l *Lexer) readIdent() string {
 func (l *Lexer) readNumber() string {
 	startingPos := l.pos
 	for l.pos < len(l.input) && isDigit(l.input[l.pos]) {
+		l.pos++
+	}
+	return l.input[startingPos:l.pos]
+}
+
+func (l *Lexer) readString() string {
+	l.pos++ // move on from starting quote literal
+	startingPos := l.pos
+	// TODO: throw error if string is unbounded and EOF comes before closing quote?
+	for l.pos < len(l.input) && l.input[l.pos] != '"' {
 		l.pos++
 	}
 	return l.input[startingPos:l.pos]
