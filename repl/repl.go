@@ -27,7 +27,7 @@ func Start(in io.Reader, out io.Writer) {
 		}
 		input := scanner.Text()
 
-		if strings.ToLower(input) == "quit" {
+		if strings.ToLower(input) == "bye" {
 			return
 		}
 
@@ -36,7 +36,9 @@ func Start(in io.Reader, out io.Writer) {
 		p := parser.New(l)
 		prg := p.ParseProgram()
 		if len(p.Errors) != 0 {
-			printParserErrors(out, p.Errors)
+			for _, msg := range p.Errors {
+				io.WriteString(out, msg+"\n")
+			}
 			continue
 		}
 		obj := evaluator.Eval(prg, env)
@@ -45,14 +47,5 @@ func Start(in io.Reader, out io.Writer) {
 			io.WriteString(out, "\n")
 		}
 
-	}
-}
-
-func printParserErrors(out io.Writer, errors []string) {
-	for _, msg := range errors {
-		_, err := io.WriteString(out, "\t"+msg+"\n")
-		if err != nil {
-			return
-		}
 	}
 }

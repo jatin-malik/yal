@@ -24,6 +24,7 @@ var builtinFunctions = map[string]*BuiltinFunction{
 	"last":  {builtinLast},
 	"rest":  {builtinRest},
 	"push":  {builtinPush},
+	"puts":  {builtinPuts},
 }
 
 var (
@@ -106,5 +107,13 @@ var (
 		default:
 			return NewError(fmt.Sprintf("push(): type %s not supported", arg.Type()))
 		}
+	}
+
+	builtinPuts = func(args ...Object) Object {
+		for _, arg := range args {
+			fmt.Print(arg.Inspect())
+		}
+		fmt.Println()
+		return nil
 	}
 )

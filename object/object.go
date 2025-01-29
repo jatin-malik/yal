@@ -52,7 +52,7 @@ func (string *String) Type() ObjectType {
 }
 
 func (string *String) Inspect() string {
-	return fmt.Sprintf("\"%s\"", string.Value)
+	return string.Value
 }
 
 type Boolean struct {
