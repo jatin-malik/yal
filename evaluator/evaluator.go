@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"github.com/jatin-malik/yal/ast"
 	"github.com/jatin-malik/yal/object"
+	"github.com/jatin-malik/yal/token"
 )
+
+type ASTModifier func(ast.Node) ast.Node
 
 func Eval(node ast.Node, env *object.Environment) object.Object {
 	var result object.Object
@@ -74,6 +77,11 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			Body:       v.Body,
 		}
 	case *ast.CallExpression:
+
+		if v.Function.TokenLiteral() == "quote" {
+			return quote(v.Arguments[0], env) // allow only one arg to quote
+		}
+
 		fn := Eval(v.Function, env)
 		if isErrorValue(fn) {
 			return fn
@@ -422,4 +430,75 @@ func isErrorValue(obj object.Object) bool {
 		return true
 	}
 	return false
+}
+
+func quote(node ast.Node, env *object.Environment) *object.Quote {
+	node = handleUnquotes(node, env)
+	return &object.Quote{Node: node}
+}
+
+func handleUnquotes(quoted ast.Node, env *object.Environment) ast.Node {
+	return ASTWalker(quoted, func(node ast.Node) ast.Node {
+		// Check if node is target node, otherwise no op.
+		if _, ok := node.(*ast.CallExpression); !ok {
+			return node
+		}
+
+		ce := node.(*ast.CallExpression)
+		if _, ok := ce.Function.(*ast.Identifier); !ok {
+			return node
+		}
+
+		if ce.Function.(*ast.Identifier).Value != "unquote" {
+			return node
+		}
+
+		// This is our target node
+		obj := Eval(ce.Arguments[0], env)
+		return objToNode(obj)
+	})
+}
+
+// ASTWalker walks the input AST and applies modifier to each node.
+func ASTWalker(node ast.Node, modifier ASTModifier) ast.Node {
+	switch node := node.(type) {
+	case *ast.Program:
+		for i, statement := range node.Statements {
+			node.Statements[i] = ASTWalker(statement, modifier).(ast.Statement)
+		}
+	case *ast.ExpressionStatement:
+		node.Expr = ASTWalker(node.Expr, modifier).(ast.Expression)
+	case *ast.InfixExpression:
+		node.Left = ASTWalker(node.Left, modifier).(ast.Expression)
+		node.Right = ASTWalker(node.Right, modifier).(ast.Expression)
+	case *ast.FunctionLiteral:
+		for i, param := range node.Parameters {
+			node.Parameters[i] = ASTWalker(param, modifier).(*ast.Identifier)
+		}
+
+		node.Body = ASTWalker(node.Body, modifier).(*ast.BlockStatement)
+	case *ast.BlockStatement:
+		for i, statement := range node.Statements {
+			node.Statements[i] = ASTWalker(statement, modifier).(ast.Statement)
+		}
+	}
+
+	return modifier(node)
+}
+
+func objToNode(obj object.Object) ast.Node {
+	switch obj := obj.(type) {
+	case *object.Integer:
+		return &ast.IntegerLiteral{
+			Token: token.Token{
+				Type:    token.INT,
+				Literal: fmt.Sprintf("%d", obj.Value),
+			},
+			Value: obj.Value,
+		}
+	case *object.Quote:
+		return obj.Node
+	default:
+		return nil
+	}
 }

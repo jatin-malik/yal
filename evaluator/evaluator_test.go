@@ -28,6 +28,46 @@ func TestEvalIntegerLiteral(t *testing.T) {
 	}
 }
 
+func TestQuote(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"quote(4+4)", "( 4 + 4 )"},
+		{"quote(2 * (3 + 5))", "( 2 * ( 3 + 5 ) )"},
+		{"quote(a + b)", "( a + b )"},
+		{"quote(fn(x) { x + 1 })", "fn (x) { ( x + 1 ) }"},
+		{"quote(quote(1 + 2))", "quote(( 1 + 2 ))"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			testQuoteObject(t, obj, tt.expected)
+		})
+	}
+}
+
+func TestUnquote(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"quote(unquote(4+4))", "8"},
+		{"quote(unquote(2 * (3 + 5)))", "16"},
+		{"quote(1 + unquote(2 + 3))", "( 1 + 5 )"},
+		{"quote(fn(x) { unquote(2 + 2) })", "fn (x) { 4 }"},
+		{"quote(unquote(quote(1 + 2)))", "( 1 + 2 )"}, // Unquote should only evaluate the outermost level
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+			testQuoteObject(t, obj, tt.expected)
+		})
+	}
+}
+
 func TestEvalBooleanLiteral(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -1010,6 +1050,17 @@ func testIntegerObject(t *testing.T, obj object.Object, expected int64) {
 		}
 	} else {
 		t.Errorf("expected *object.Integer, got %s", obj.Inspect())
+
+	}
+}
+
+func testQuoteObject(t *testing.T, obj object.Object, expected string) {
+	if i, ok := obj.(*object.Quote); ok {
+		if i.Node.String() != expected {
+			t.Errorf("expected %s, got %s", expected, i.Node.String())
+		}
+	} else {
+		t.Errorf("expected *object.Quote, got %s", obj.Inspect())
 
 	}
 }

@@ -19,6 +19,7 @@ const (
 	StringObject      ObjectType = "STRING"
 	ArrayObject       ObjectType = "ARRAY"
 	HashObject        ObjectType = "HASH"
+	QuoteObject       ObjectType = "QUOTE"
 )
 
 var (
@@ -87,6 +88,23 @@ func (boolean *Boolean) Inspect() string {
 
 func (boolean *Boolean) HashKey() HashKey {
 	return HashKey{Type: boolean.Type(), Value: boolean.Inspect()}
+}
+
+type Quote struct {
+	Node ast.Node
+}
+
+func (quote *Quote) Type() ObjectType {
+	return QuoteObject
+}
+
+func (quote *Quote) Inspect() string {
+	var out bytes.Buffer
+	out.WriteString("quote")
+	out.WriteString("(")
+	out.WriteString(quote.Node.String())
+	out.WriteString(")")
+	return out.String()
 }
 
 type Array struct {
