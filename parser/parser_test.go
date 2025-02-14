@@ -233,6 +233,63 @@ func TestFunctionLiteralParsing(t *testing.T) {
 
 }
 
+func TestMacroLiteralParsing(t *testing.T) {
+	tests := []struct {
+		input                    string
+		expectedExpressionString string
+	}{
+
+		{"macro (x,y) { return quote(unquote(x)+unquote(y));}", "macro (x, y) { return quote(( unquote(x) + unquote(y) )); }"},
+		// Basic macro with unquote inside quote
+		{"macro (x,y) { return quote(unquote(x)+unquote(y));}", "macro (x, y) { return quote(( unquote(x) + unquote(y) )); }"},
+
+		// Macro with multiple expressions in the body
+		{"macro (x) { let a = 10; return quote(unquote(x) * a); }", "macro (x) { let a = 10; return quote(( unquote(x) * a )); }"},
+
+		// Macro returning a function
+		{"macro () { return quote(fn(x) { x + 1 }); }", "macro () { return quote(fn (x) { ( x + 1 ) }); }"},
+
+		// Macro with nested macros inside the body
+		{"macro () { return quote(macro (y) { return unquote(y) * 2; }); }", "macro () { return quote(macro (y) { return ( unquote(y) * 2 ); }); }"},
+
+		// Macro without arguments
+		{"macro () { return quote(42); }", "macro () { return quote(42); }"},
+
+		// Macro that includes an if expression inside quote
+		{"macro (x) { return quote(if (unquote(x) > 0) { x } else { -x }); }", "macro (x) { return quote(if ( unquote(x) > 0 ){ x } else { ( -x ) }); }"},
+
+		// Macro using multiple let bindings
+		{"macro (x, y) { let a = x; let b = y; return quote(unquote(a) + unquote(b)); }", "macro (x, y) { let a = x; let b = y; return quote(( unquote(a) + unquote(b) )); }"},
+
+		// Macro calling another macro inside quote
+		{"macro (x) { return quote(unquote(x)(10, 20)); }", "macro (x) { return quote(unquote(x)(10, 20)); }"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			l := lexer.New(tt.input)
+			parser := New(l)
+
+			program := parser.ParseProgram()
+
+			checkParserErrors(parser, t, tt.input)
+
+			if len(program.Statements) != 1 {
+				t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
+			}
+
+			if stmt, ok := program.Statements[0].(*ast.ExpressionStatement); !ok {
+				t.Error("expected an expression statement")
+			} else {
+				if stmt.String() != tt.expectedExpressionString {
+					t.Errorf("expected expression = %s, got %s", tt.expectedExpressionString, stmt.Expr.String())
+				}
+			}
+		})
+	}
+
+}
+
 func TestArrayLiteralParsing(t *testing.T) {
 	tests := []struct {
 		input                    string

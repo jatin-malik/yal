@@ -152,6 +152,38 @@ func (fl FunctionLiteral) String() string {
 	return buf.String()
 }
 
+func (fl FunctionLiteral) TokenLiteral() string {
+	return fl.Token.Literal
+}
+
+type MacroLiteral struct {
+	Token      token.Token
+	Parameters []*Identifier
+	Body       *BlockStatement
+}
+
+func (ml MacroLiteral) expressionBehaviour() {}
+
+func (ml MacroLiteral) String() string {
+	var buf bytes.Buffer
+	buf.WriteString(ml.TokenLiteral() + " ")
+	buf.WriteString("(")
+	for i, parameter := range ml.Parameters {
+		if i > 0 {
+			buf.WriteString(", ")
+
+		}
+		buf.WriteString(parameter.Value)
+	}
+	buf.WriteString(") ")
+	buf.WriteString(ml.Body.String())
+	return buf.String()
+}
+
+func (ml MacroLiteral) TokenLiteral() string {
+	return ml.Token.Literal
+}
+
 type IfElseConditional struct {
 	Token       token.Token
 	Condition   Expression
@@ -178,10 +210,6 @@ func (iec IfElseConditional) String() string {
 
 func (iec IfElseConditional) TokenLiteral() string {
 	return iec.Token.Literal
-}
-
-func (fl FunctionLiteral) TokenLiteral() string {
-	return fl.Token.Literal
 }
 
 type PrefixExpression struct {

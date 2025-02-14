@@ -31,6 +31,7 @@ const (
 	INT      TokenType = "INT"
 	STRING   TokenType = "STRING"
 	FUNCTION TokenType = "FUNCTION"
+	MACRO    TokenType = "MACRO"
 	IF       TokenType = "IF"
 	ELSE     TokenType = "ELSE"
 	RETURN   TokenType = "RETURN"
@@ -51,6 +52,7 @@ type Token struct {
 var keywords = map[string]TokenType{
 	"let":    LET,
 	"fn":     FUNCTION,
+	"macro":  MACRO,
 	"if":     IF,
 	"else":   ELSE,
 	"return": RETURN,

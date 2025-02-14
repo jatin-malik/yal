@@ -38,6 +38,7 @@ func New(lexer *lexer.Lexer) *Parser {
 	parser.registerPrefix(token.TRUE, parser.parseBooleanLiteral)
 	parser.registerPrefix(token.FALSE, parser.parseBooleanLiteral)
 	parser.registerPrefix(token.FUNCTION, parser.parseFunctionLiteral)
+	parser.registerPrefix(token.MACRO, parser.parseMacroLiteral)
 	parser.registerPrefix(token.IF, parser.parseIfElseConditional)
 	parser.registerPrefix(token.STRING, parser.parseStringLiteral)
 	parser.registerPrefix(token.LBRACKET, parser.parseArrayLiteral)
@@ -184,6 +185,18 @@ func (p *Parser) parseBooleanLiteral() ast.Expression {
 
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	exp := &ast.FunctionLiteral{
+		Token: p.curToken,
+	}
+
+	p.Next()
+	exp.Parameters = p.parseFunctionParams()
+	p.Next()
+	exp.Body = p.parseBlockStatement()
+	return exp
+}
+
+func (p *Parser) parseMacroLiteral() ast.Expression {
+	exp := &ast.MacroLiteral{
 		Token: p.curToken,
 	}
 
