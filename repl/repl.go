@@ -15,7 +15,8 @@ import (
 func Start(in io.Reader, out io.Writer) {
 	prompt := ">> "
 	scanner := bufio.NewScanner(in)
-	env := object.NewEnvironment(nil) // shared scope across all REPL statements
+	macroEnv := object.NewEnvironment(nil) // shared scope across all macro expansions
+	env := object.NewEnvironment(nil)      // shared scope across all REPL statements evaluation
 	for {
 		io.WriteString(out, prompt)
 		// Read
@@ -41,7 +42,13 @@ func Start(in io.Reader, out io.Writer) {
 			}
 			continue
 		}
-		obj := evaluator.Eval(prg, env)
+
+		expandedAST, err := evaluator.ExpandMacro(prg, macroEnv)
+		if err != nil {
+			io.WriteString(out, err.Error()+"\n")
+			continue
+		}
+		obj := evaluator.Eval(expandedAST, env)
 		if obj != nil {
 			io.WriteString(out, obj.Inspect())
 			io.WriteString(out, "\n")

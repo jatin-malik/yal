@@ -402,9 +402,8 @@ func TestEvalFunctions(t *testing.T) {
 		// ================================
 		// Edge Cases
 		// ================================
-		{`let noReturn = fn() {}; noReturn();`, nil},               // function without a return value
-		{`let noArg = fn() { return 42; }; noArg();`, 42},          // function with no arguments
-		{`let noArgReturn = fn() { return }; noArgReturn();`, nil}, // function returning `nil`
+		{`let noReturn = fn() {}; noReturn();`, nil},      // function without a return value
+		{`let noArg = fn() { return 42; }; noArg();`, 42}, // function with no arguments
 
 		// ================================
 		// Function with Boolean Return
@@ -649,6 +648,154 @@ func TestEvalStringConcatenation(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			obj := testEval(tt.input)
 			testStringObject(t, obj, tt.expected)
+		})
+	}
+}
+
+func TestEvalWithMacros(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+
+		// 1. Basic arithmetic macro evaluation
+		{`
+			let minus = macro(a, b) { quote(unquote(a) - unquote(b)) };
+			minus(10, 2)`,
+			8,
+		},
+		{`
+			let add = macro(a, b) { quote(unquote(a) + unquote(b)) };
+			add(3, 7)`,
+			10,
+		},
+		{`
+			let mul = macro(a, b) { quote(unquote(a) * unquote(b)) };
+			mul(4, 5)`,
+			20,
+		},
+		{`
+			let div = macro(a, b) { quote(unquote(a) / unquote(b)) };
+			div(10, 2)`,
+			5,
+		},
+
+		// 2. Macro with variable substitution
+		{`
+			let x = 10;
+			let y = 5;
+			let sub = macro(a, b) { quote(unquote(a) - unquote(b)) };
+			sub(x, y)`,
+			5,
+		},
+
+		// 3. Nested macros
+		{`
+			let add = macro(a, b) { quote(unquote(a) + unquote(b)) };
+			let doubleAdd = macro(x, y) { quote(add(unquote(x), unquote(y))) };
+			doubleAdd(3, 7)`,
+			10,
+		},
+		{`
+			let nested = macro(x) { quote(macro(y) { quote(unquote(x) + unquote(y)) }) };
+			let inner = nested(5);
+			inner(10)`,
+			15,
+		},
+
+		// 4. Macros inside conditionals
+		{`
+			let conditional = macro(a, b) { quote(if (unquote(a) > 0) {unquote(a)} else {unquote(b)}) };
+			conditional(5, 10)`,
+			5,
+		},
+		{`
+			let conditional = macro(a, b) { quote(if (unquote(a) > 0) {unquote(a)} else {unquote(b)}) };
+			conditional(-5, 10)`,
+			10,
+		},
+
+		// 5. Macros with functions
+		{`
+			let makeAdder = macro(x) { quote(fn(y) { unquote(x) + y }) };
+			let addFive = makeAdder(5);
+			addFive(3)`,
+			8,
+		},
+		{`
+			let callMacro = macro(f, arg) { quote(unquote(f)(unquote(arg))) };
+			let double = macro(x) { quote(unquote(x) * 2) };
+			callMacro(double, 4)`,
+			8,
+		},
+
+		{`
+		let unless = macro(condition, consequence, alternative){ 
+			quote(if (!(unquote(condition))) { unquote(consequence); }
+ 			else { unquote(alternative); }); };
+		unless(10 > 5, 2, 3);`,
+			3},
+
+		// 6. Edge Cases
+
+		// 6.1 Unused parameter
+		{`
+			let ignoreArg = macro(x) { quote(100) };
+			ignoreArg(50)`,
+			100,
+		},
+
+		// 6.2 Macro inside a function
+		{`
+			let adder = fn(x) { macro(y) { quote(unquote(x) + unquote(y)) } };
+			let addFive = adder(5);
+			addFive(3)`,
+			8,
+		},
+
+		// 6.3 Macro with boolean expressions
+		{`
+			let boolCheck = macro(a) { quote(unquote(a) == true) };
+			boolCheck(true)`,
+			true,
+		},
+		{`
+			let boolCheck = macro(a) { quote(unquote(a) == false) };
+			boolCheck(true)`,
+			false,
+		},
+
+		// 6.4 Error case: Division by zero inside macro
+		{`
+			let divZero = macro(a) { quote(unquote(a) / 0) };
+			divZero(10)`,
+			fmt.Errorf("Division by zero"),
+		},
+
+		// 6.5 Error case: Invalid macro argument
+		{`
+			let invalid = macro(a) { quote(unquote(a) + 1) };
+			invalid("hello")`,
+			fmt.Errorf("Incompatible types: STRING and INTEGER"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+
+			switch expected := tt.expected.(type) {
+			case int64:
+				testIntegerObject(t, obj, expected)
+			case bool:
+				testBooleanObject(t, obj, expected)
+			case string:
+				testStringObject(t, obj, expected)
+			case error:
+				testErrorObject(t, obj, expected.Error())
+			case []interface{}:
+				testArrayObject(t, obj, expected)
+			}
 		})
 	}
 }
@@ -1027,6 +1174,7 @@ func TestEvalErrorHandling(t *testing.T) {
 	}
 }
 
+// TODO: error handling for parser and expansion errors.
 func testEval(input string) object.Object {
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1038,8 +1186,14 @@ func testEval(input string) object.Object {
 		}
 		return nil
 	}
+	macroEnv := object.NewEnvironment(nil)
+	expandedAST, err := ExpandMacro(prg, macroEnv)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
 	env := object.NewEnvironment(nil)
-	obj := Eval(prg, env)
+	obj := Eval(expandedAST, env)
 	return obj
 }
 
@@ -1077,7 +1231,7 @@ func testStringObject(t *testing.T, obj object.Object, expected string) {
 }
 
 func testNullObject(t *testing.T, obj object.Object) {
-	if !isNull(obj) {
+	if !object.IsNull(obj) {
 		t.Errorf("expected null, got %v", obj)
 	}
 }

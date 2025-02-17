@@ -16,6 +16,7 @@ const (
 	ReturnValueObject ObjectType = "RETURN_VALUE"
 	ErrorValueObject  ObjectType = "ERROR"
 	FunctionObject    ObjectType = "FUNCTION"
+	MacroObject       ObjectType = "MACRO"
 	StringObject      ObjectType = "STRING"
 	ArrayObject       ObjectType = "ARRAY"
 	HashObject        ObjectType = "HASH"
@@ -172,6 +173,30 @@ func (function *Function) Inspect() string {
 	out.WriteString(strings.Join(params, ", "))
 	out.WriteString(") {\n")
 	out.WriteString(function.Body.String())
+	out.WriteString("\n}")
+	return out.String()
+}
+
+type Macro struct {
+	Env        *Environment
+	Parameters []*ast.Identifier
+	Body       *ast.BlockStatement
+}
+
+func (macro *Macro) Type() ObjectType {
+	return MacroObject
+}
+
+func (macro *Macro) Inspect() string {
+	var out bytes.Buffer
+	var params []string
+	for _, p := range macro.Parameters {
+		params = append(params, p.String())
+	}
+	out.WriteString("macro(")
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(") {\n")
+	out.WriteString(macro.Body.String())
 	out.WriteString("\n}")
 	return out.String()
 }

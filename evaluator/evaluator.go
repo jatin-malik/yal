@@ -1,13 +1,12 @@
 package evaluator
 
 import (
+	"errors"
 	"fmt"
 	"github.com/jatin-malik/yal/ast"
 	"github.com/jatin-malik/yal/object"
 	"github.com/jatin-malik/yal/token"
 )
-
-type ASTModifier func(ast.Node) ast.Node
 
 func Eval(node ast.Node, env *object.Environment) object.Object {
 	var result object.Object
@@ -15,23 +14,23 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.Program:
 		for _, stmt := range v.Statements {
 			result = Eval(stmt, env)
-			if isReturnValue(result) {
+			if object.IsReturnValue(result) {
 				return result.(*object.ReturnValue).Value // unwrap
 			}
-			if isErrorValue(result) {
+			if object.IsErrorValue(result) {
 				return result // no unwrap
 			}
 		}
 	case *ast.BlockStatement:
 		for _, stmt := range v.Statements {
 			result = Eval(stmt, env)
-			if isReturnValue(result) || isErrorValue(result) {
+			if object.IsReturnValue(result) || object.IsErrorValue(result) {
 				return result
 			}
 		}
 	case *ast.ReturnStatement:
 		obj := Eval(v.Value, env)
-		if isErrorValue(obj) {
+		if object.IsErrorValue(obj) {
 			return obj
 		}
 		result = &object.ReturnValue{Value: obj}
@@ -47,7 +46,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		var elems []object.Object
 		for _, elem := range v.Elements {
 			result = Eval(elem, env)
-			if isErrorValue(result) {
+			if object.IsErrorValue(result) {
 				return result
 			}
 			elems = append(elems, result)
@@ -58,11 +57,11 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 
 		for k, v := range v.Pairs {
 			key := Eval(k, env)
-			if isErrorValue(key) {
+			if object.IsErrorValue(key) {
 				return key
 			}
 			val := Eval(v, env)
-			if isErrorValue(val) {
+			if object.IsErrorValue(val) {
 				return val
 			}
 			pairs[key] = val
@@ -79,32 +78,41 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.CallExpression:
 
 		if v.Function.TokenLiteral() == "quote" {
-			return quote(v.Arguments[0], env) // allow only one arg to quote
+			if len(v.Arguments) != 1 {
+				return object.NewError("quote supports only 1 argument")
+			}
+			return quote(v.Arguments[0], env)
 		}
 
 		fn := Eval(v.Function, env)
-		if isErrorValue(fn) {
+		if object.IsErrorValue(fn) {
 			return fn
 		}
 
 		var args []object.Object
-		for _, arg := range v.Arguments {
-			result = Eval(arg, env)
-			if isErrorValue(result) {
-				return result
+		if _, ok := fn.(*object.Macro); ok {
+			for _, arg := range v.Arguments {
+				args = append(args, &object.Quote{Node: arg})
 			}
-			args = append(args, result)
+		} else {
+			for _, arg := range v.Arguments {
+				result = Eval(arg, env)
+				if object.IsErrorValue(result) {
+					return result
+				}
+				args = append(args, result)
+			}
 		}
 
 		result = evalCallExpression(fn, args)
 	case *ast.IndexExpression:
 		iterable := Eval(v.Left, env)
-		if isErrorValue(iterable) {
+		if object.IsErrorValue(iterable) {
 			return iterable
 		}
 
 		idx := Eval(v.Index, env)
-		if isErrorValue(idx) {
+		if object.IsErrorValue(idx) {
 			return idx
 		}
 
@@ -112,23 +120,23 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 
 	case *ast.PrefixExpression:
 		operandObject := Eval(v.Right, env)
-		if isErrorValue(operandObject) {
+		if object.IsErrorValue(operandObject) {
 			return operandObject
 		}
 		result = evalPrefixExpression(v.Operator, operandObject)
 	case *ast.InfixExpression:
 		leftObj := Eval(v.Left, env)
-		if isErrorValue(leftObj) {
+		if object.IsErrorValue(leftObj) {
 			return leftObj
 		}
 		rightObj := Eval(v.Right, env)
-		if isErrorValue(rightObj) {
+		if object.IsErrorValue(rightObj) {
 			return rightObj
 		}
 		result = evalInfixExpression(v.Operator, leftObj, rightObj)
 	case *ast.IfElseConditional:
 		conditionObj := Eval(v.Condition, env)
-		if isErrorValue(conditionObj) {
+		if object.IsErrorValue(conditionObj) {
 			return conditionObj
 		}
 		if isTruthy(conditionObj) {
@@ -142,7 +150,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 	case *ast.LetStatement:
 		rightObj := Eval(v.Right, env)
-		if isErrorValue(rightObj) {
+		if object.IsErrorValue(rightObj) {
 			return rightObj
 		}
 		env.Set(v.Name.Value, rightObj)
@@ -272,7 +280,7 @@ func evalEqualsInfixExpression(left, right object.Object) object.Object {
 // TODO: Converting x!=y to !(x==y) for reuse. Check for correctness.
 func evalNotEqualsInfixExpression(left, right object.Object) object.Object {
 	obj := evalEqualsInfixExpression(left, right)
-	if isNull(obj) {
+	if object.IsNull(obj) {
 		return object.NULL
 	}
 	return getBooleanObject(!obj.(*object.Boolean).Value)
@@ -331,10 +339,30 @@ func evalCallExpression(function object.Object, args []object.Object) object.Obj
 		}
 
 		result := Eval(fn.Body, extendedEnv)
-		if isReturnValue(result) {
+		if object.IsReturnValue(result) {
 			return result.(*object.ReturnValue).Value // unwrap
 		}
 		return result
+	case object.MacroObject:
+		macro := function.(*object.Macro)
+		// Extend the environment for this macro expansion
+		extendedEnv := object.NewEnvironment(macro.Env)
+
+		if len(macro.Parameters) != len(args) {
+			msg := fmt.Sprintf("expected %d parameters, got %d args", len(macro.Parameters), len(args))
+			return object.NewError(msg)
+		}
+
+		for idx, param := range macro.Parameters {
+			extendedEnv.Set(param.Value, args[idx])
+		}
+
+		result := Eval(macro.Body, extendedEnv)
+		if object.IsReturnValue(result) {
+			return result.(*object.ReturnValue).Value // unwrap
+		}
+		return result
+
 	case object.BuiltInFunctionObject:
 		fn := function.(*object.BuiltinFunction)
 		return fn.Fn(args...)
@@ -414,76 +442,41 @@ func evalHashLiteral(pairs map[object.Object]object.Object) object.Object {
 	return ho
 }
 
-func isNull(obj object.Object) bool {
-	return obj == object.NULL
-}
-
-func isReturnValue(obj object.Object) bool {
-	if _, ok := obj.(*object.ReturnValue); ok {
-		return true
+func quote(node ast.Node, env *object.Environment) object.Object {
+	node, err := handleUnquotes(node, env)
+	if err != nil {
+		return &object.Error{Message: err.Error()}
 	}
-	return false
-}
-
-func isErrorValue(obj object.Object) bool {
-	if _, ok := obj.(*object.Error); ok {
-		return true
-	}
-	return false
-}
-
-func quote(node ast.Node, env *object.Environment) *object.Quote {
-	node = handleUnquotes(node, env)
 	return &object.Quote{Node: node}
 }
 
-func handleUnquotes(quoted ast.Node, env *object.Environment) ast.Node {
-	return ASTWalker(quoted, func(node ast.Node) ast.Node {
+func handleUnquotes(quoted ast.Node, env *object.Environment) (ast.Node, error) {
+	return ast.Walker(quoted, func(node ast.Node) (ast.Node, error) {
 		// Check if node is target node, otherwise no op.
 		if _, ok := node.(*ast.CallExpression); !ok {
-			return node
+			return node, nil
 		}
 
 		ce := node.(*ast.CallExpression)
 		if _, ok := ce.Function.(*ast.Identifier); !ok {
-			return node
+			return node, nil
 		}
 
 		if ce.Function.(*ast.Identifier).Value != "unquote" {
-			return node
+			return node, nil
+		}
+
+		if len(ce.Arguments) != 1 {
+			return nil, errors.New("unquote() supports only 1 argument")
 		}
 
 		// This is our target node
 		obj := Eval(ce.Arguments[0], env)
-		return objToNode(obj)
+		if object.IsErrorValue(obj) {
+			return nil, errors.New(obj.(*object.Error).Message)
+		}
+		return objToNode(obj), nil
 	})
-}
-
-// ASTWalker walks the input AST and applies modifier to each node.
-func ASTWalker(node ast.Node, modifier ASTModifier) ast.Node {
-	switch node := node.(type) {
-	case *ast.Program:
-		for i, statement := range node.Statements {
-			node.Statements[i] = ASTWalker(statement, modifier).(ast.Statement)
-		}
-	case *ast.ExpressionStatement:
-		node.Expr = ASTWalker(node.Expr, modifier).(ast.Expression)
-	case *ast.InfixExpression:
-		node.Left = ASTWalker(node.Left, modifier).(ast.Expression)
-		node.Right = ASTWalker(node.Right, modifier).(ast.Expression)
-	case *ast.FunctionLiteral:
-		for i, param := range node.Parameters {
-			node.Parameters[i] = ASTWalker(param, modifier).(*ast.Identifier)
-		}
-
-		node.Body = ASTWalker(node.Body, modifier).(*ast.BlockStatement)
-	case *ast.BlockStatement:
-		for i, statement := range node.Statements {
-			node.Statements[i] = ASTWalker(statement, modifier).(ast.Statement)
-		}
-	}
-
-	return modifier(node)
 }
 
 func objToNode(obj object.Object) ast.Node {

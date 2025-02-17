@@ -18,8 +18,15 @@ func Interpret(input string) {
 		}
 		return
 	}
+
+	macroEnv := object.NewEnvironment(nil)
+	expandedAST, err := evaluator.ExpandMacro(prg, macroEnv)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	env := object.NewEnvironment(nil)
-	obj := evaluator.Eval(prg, env)
+	obj := evaluator.Eval(expandedAST, env)
 	if obj != nil {
 		fmt.Println(obj.Inspect())
 	}

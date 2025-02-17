@@ -52,6 +52,49 @@ func TestLetStatement(t *testing.T) {
 
 }
 
+func TestMacroDefinitions(t *testing.T) {
+	tests := []struct {
+		input                    string
+		expectedName             string
+		expectedExpressionString string
+	}{
+		{"let m = macro() { quote(2) };", "m", "macro () { quote(2) }"},
+		{"let identity = macro(x) { quote(x) };", "identity", "macro (x) { quote(x) }"},
+		{"let add = macro(a, b) { quote(a + b) };", "add", "macro (a, b) { quote(( a + b )) }"},
+		{"let nested = macro() { quote(macro() { quote(1) }) };", "nested", "macro () { quote(macro () { quote(1) }) }"},
+		{"let callMacro = macro(x) { quote(x(5)) };", "callMacro", "macro (x) { quote(x(5)) }"},
+		{"let wrapFunction = macro(f, arg) { quote(f(arg)) };", "wrapFunction", "macro (f, arg) { quote(f(arg)) }"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			l := lexer.New(tt.input)
+			parser := New(l)
+
+			program := parser.ParseProgram()
+
+			checkParserErrors(parser, t, tt.input)
+
+			if len(program.Statements) != 1 {
+				t.Errorf("expected %d statements, got %d\n", 1, len(program.Statements))
+			}
+
+			if stmt, ok := program.Statements[0].(*ast.LetStatement); !ok {
+				t.Error("expected a let statement")
+			} else {
+				if stmt.Name.Value != tt.expectedName {
+					t.Errorf("expected identifier name = %s, got %s", tt.expectedName, stmt.Name.Value)
+				}
+
+				if stmt.Right.String() != tt.expectedExpressionString {
+					t.Errorf("expected right expression = %s, got %s", tt.expectedExpressionString, stmt.Right.String())
+				}
+			}
+		})
+	}
+
+}
+
 func TestReturnStatement(t *testing.T) {
 	tests := []struct {
 		input                    string
