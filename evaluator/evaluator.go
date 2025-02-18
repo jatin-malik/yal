@@ -389,7 +389,7 @@ func evalArrayIndexExpression(iterable object.Object, index object.Object) objec
 
 	// The index has to be an integer
 	if i, ok := index.(*object.Integer); !ok {
-		return object.NewError(fmt.Sprintf("index must be an integer for index expression in arrays"))
+		return object.NewError("index must be an integer for index expression in arrays")
 	} else {
 		// Check bounds of the index
 		idx := i.Value

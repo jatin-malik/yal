@@ -53,7 +53,7 @@ var (
 			if len(arg.Elements) > 0 {
 				return arg.Elements[0]
 			}
-			return NewError(fmt.Sprintf("empty array"))
+			return NewError("empty array")
 		default:
 			return NewError(fmt.Sprintf("first(): type %s not supported", arg.Type()))
 		}
@@ -69,7 +69,7 @@ var (
 			if len(arg.Elements) > 0 {
 				return arg.Elements[len(arg.Elements)-1]
 			}
-			return NewError(fmt.Sprintf("empty array"))
+			return NewError("empty array")
 		default:
 			return NewError(fmt.Sprintf("last(): type %s not supported", arg.Type()))
 		}
@@ -87,7 +87,7 @@ var (
 				copy(restArray, arg.Elements[1:])
 				return &Array{Elements: restArray}
 			}
-			return NewError(fmt.Sprintf("empty array"))
+			return NewError("empty array")
 		default:
 			return NewError(fmt.Sprintf("rest(): type %s not supported", arg.Type()))
 		}

@@ -3,11 +3,12 @@ package repl
 
 import (
 	"bufio"
+	"io"
+	"strings"
+
 	"github.com/jatin-malik/yal/evaluator"
 	"github.com/jatin-malik/yal/object"
 	"github.com/jatin-malik/yal/parser"
-	"io"
-	"strings"
 
 	"github.com/jatin-malik/yal/lexer"
 )
@@ -18,11 +19,11 @@ func Start(in io.Reader, out io.Writer) {
 	macroEnv := object.NewEnvironment(nil) // shared scope across all macro expansions
 	env := object.NewEnvironment(nil)      // shared scope across all REPL statements evaluation
 	for {
-		io.WriteString(out, prompt)
+		_, _ = io.WriteString(out, prompt)
 		// Read
 		if !scanner.Scan() {
 			if scanner.Err() != nil {
-				io.WriteString(out, "scanning errored out")
+				_, _ = io.WriteString(out, "scanning errored out")
 			}
 			return
 		}
@@ -38,20 +39,20 @@ func Start(in io.Reader, out io.Writer) {
 		prg := p.ParseProgram()
 		if len(p.Errors) != 0 {
 			for _, msg := range p.Errors {
-				io.WriteString(out, msg+"\n")
+				_, _ = io.WriteString(out, msg+"\n")
 			}
 			continue
 		}
 
 		expandedAST, err := evaluator.ExpandMacro(prg, macroEnv)
 		if err != nil {
-			io.WriteString(out, err.Error()+"\n")
+			_, _ = io.WriteString(out, err.Error()+"\n")
 			continue
 		}
 		obj := evaluator.Eval(expandedAST, env)
 		if obj != nil {
-			io.WriteString(out, obj.Inspect())
-			io.WriteString(out, "\n")
+			_, _ = io.WriteString(out, obj.Inspect())
+			_, _ = io.WriteString(out, "\n")
 		}
 
 	}
