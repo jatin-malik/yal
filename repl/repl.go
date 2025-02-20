@@ -3,6 +3,8 @@ package repl
 
 import (
 	"bufio"
+	"github.com/jatin-malik/yal/compiler"
+	"github.com/jatin-malik/yal/vm"
 	"io"
 	"strings"
 
@@ -17,7 +19,7 @@ func Start(in io.Reader, out io.Writer) {
 	prompt := ">> "
 	scanner := bufio.NewScanner(in)
 	macroEnv := object.NewEnvironment(nil) // shared scope across all macro expansions
-	env := object.NewEnvironment(nil)      // shared scope across all REPL statements evaluation
+	//env := object.NewEnvironment(nil)      // shared scope across all REPL statements evaluation
 	for {
 		_, _ = io.WriteString(out, prompt)
 		// Read
@@ -49,11 +51,27 @@ func Start(in io.Reader, out io.Writer) {
 			_, _ = io.WriteString(out, err.Error()+"\n")
 			continue
 		}
-		obj := evaluator.Eval(expandedAST, env)
+
+		//obj := evaluator.Eval(expandedAST, env)
+
+		compiler := compiler.New()
+		err = compiler.Compile(expandedAST)
+		if err != nil {
+			_, _ = io.WriteString(out, err.Error()+"\n")
+			continue
+		}
+
+		bytecode := compiler.Emit()
+		vm := vm.NewStackVM(bytecode.Instructions, bytecode.ConstantPool)
+		err = vm.Run()
+		if err != nil {
+			_, _ = io.WriteString(out, err.Error()+"\n")
+			continue
+		}
+		obj := vm.Top()
 		if obj != nil {
 			_, _ = io.WriteString(out, obj.Inspect())
 			_, _ = io.WriteString(out, "\n")
 		}
-
 	}
 }
