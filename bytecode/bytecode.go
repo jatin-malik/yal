@@ -13,6 +13,16 @@ type OpCode byte
 const (
 	OpPush OpCode = iota
 	OpAdd
+	OpSub
+	OpMul
+	OpDiv
+	OpPushTrue
+	OpPushFalse
+	OpEqual
+	OpNotEqual
+	OpGT
+	OpNegateBoolean
+	OpNegateNumber
 )
 
 // Make generates a bytecode instruction from the input opCode and operands. Multibyte operands are encoded in
@@ -30,7 +40,7 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 		var operandBytes [2]byte
 		binary.BigEndian.PutUint16(operandBytes[:], uint16(idx))
 		instructions.Write(operandBytes[:])
-	case OpAdd:
+	case OpAdd, OpSub, OpMul, OpDiv, OpPushTrue, OpPushFalse, OpEqual, OpNotEqual, OpGT, OpNegateBoolean, OpNegateNumber:
 	default:
 		return nil, fmt.Errorf("unknown opcode: %d", opCode)
 	}

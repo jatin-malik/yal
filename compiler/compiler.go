@@ -41,35 +41,76 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		if err != nil {
 			return err
 		}
-	case *ast.InfixExpression:
-		err := compiler.Compile(n.Left)
-		if err != nil {
-			return err
-		}
-
-		err = compiler.Compile(n.Right)
+	case *ast.PrefixExpression:
+		err := compiler.Compile(n.Right)
 		if err != nil {
 			return err
 		}
 
 		switch n.Operator {
-		case "+":
-			ins, err := bytecode.Make(bytecode.OpAdd)
-			if err != nil {
-				return err
-			}
-			compiler.addInstruction(ins)
+		case "!":
+			compiler.emit(bytecode.OpNegateBoolean)
+		case "-":
+			compiler.emit(bytecode.OpNegateNumber)
 		default:
 			return fmt.Errorf("unknown operator %s", n.Operator)
 		}
+	case *ast.InfixExpression:
+
+		if n.Operator == "<" {
+			err := compiler.Compile(n.Right)
+			if err != nil {
+				return err
+			}
+
+			err = compiler.Compile(n.Left)
+			if err != nil {
+				return err
+			}
+
+			compiler.emit(bytecode.OpGT)
+
+		} else {
+			err := compiler.Compile(n.Left)
+			if err != nil {
+				return err
+			}
+
+			err = compiler.Compile(n.Right)
+			if err != nil {
+				return err
+			}
+
+			switch n.Operator {
+			case "+":
+				compiler.emit(bytecode.OpAdd)
+			case "-":
+				compiler.emit(bytecode.OpSub)
+			case "*":
+				compiler.emit(bytecode.OpMul)
+			case "/":
+				compiler.emit(bytecode.OpDiv)
+			case "==":
+				compiler.emit(bytecode.OpEqual)
+			case "!=":
+				compiler.emit(bytecode.OpNotEqual)
+			case ">":
+				compiler.emit(bytecode.OpGT)
+			default:
+				return fmt.Errorf("unknown operator %s", n.Operator)
+			}
+		}
+
 	case *ast.IntegerLiteral:
 		obj := &object.Integer{Value: n.Value}
 		idx := compiler.addConstant(obj)
-		ins, err := bytecode.Make(bytecode.OpPush, idx)
-		if err != nil {
-			return err
+		compiler.emit(bytecode.OpPush, idx)
+	case *ast.BooleanLiteral:
+		if n.Value {
+			compiler.emit(bytecode.OpPushTrue)
+		} else {
+			compiler.emit(bytecode.OpPushFalse)
 		}
-		compiler.addInstruction(ins)
 	}
 	return nil
 }
@@ -85,10 +126,19 @@ func (compiler *Compiler) addInstruction(ins []byte) {
 	compiler.instructions = append(compiler.instructions, ins...)
 }
 
-// Emit wraps compiler output in ByteCode struct and returns it
-func (compiler *Compiler) Emit() ByteCode {
+// Output wraps compiler output in ByteCode struct and returns it
+func (compiler *Compiler) Output() ByteCode {
 	return ByteCode{
 		Instructions: compiler.instructions,
 		ConstantPool: compiler.constantPool,
 	}
+}
+
+func (compiler *Compiler) emit(op bytecode.OpCode, operands ...int) error {
+	ins, err := bytecode.Make(op, operands...)
+	if err != nil {
+		return err
+	}
+	compiler.addInstruction(ins)
+	return nil
 }

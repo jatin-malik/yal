@@ -17,3 +17,12 @@ func IsReturnValue(obj Object) bool {
 	}
 	return false
 }
+
+func IsTruthy(obj Object) bool {
+	switch obj {
+	case NULL, FALSE:
+		return false
+	default:
+		return true
+	}
+}

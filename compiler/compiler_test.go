@@ -26,6 +26,42 @@ func TestCompile(t *testing.T) {
 			},
 			expectedConstantPool: []any{1, 2},
 		},
+
+		{
+			input: "2 - 1",
+			expectedByteCode: bytecode.Instructions{
+				0x00,       // OpPush (1)
+				0x00, 0x00, // Index 0 (constant pool: 1)
+				0x00,       // OpPush (2)
+				0x00, 0x01, // Index 1 (constant pool: 2)
+				0x02, // OpSub
+			},
+			expectedConstantPool: []any{2, 1},
+		},
+
+		{
+			input: "2 * 3",
+			expectedByteCode: bytecode.Instructions{
+				0x00,       // OpPush (1)
+				0x00, 0x00, // Index 0 (constant pool: 1)
+				0x00,       // OpPush (2)
+				0x00, 0x01, // Index 1 (constant pool: 2)
+				0x03, // OpMul
+			},
+			expectedConstantPool: []any{2, 3},
+		},
+
+		{
+			input: "4 / 2",
+			expectedByteCode: bytecode.Instructions{
+				0x00,       // OpPush (1)
+				0x00, 0x00, // Index 0 (constant pool: 1)
+				0x00,       // OpPush (2)
+				0x00, 0x01, // Index 1 (constant pool: 2)
+				0x04, // OpDiv
+			},
+			expectedConstantPool: []any{4, 2},
+		},
 	}
 
 	for _, tt := range tests {

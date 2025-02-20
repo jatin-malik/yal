@@ -139,7 +139,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		if object.IsErrorValue(conditionObj) {
 			return conditionObj
 		}
-		if isTruthy(conditionObj) {
+		if object.IsTruthy(conditionObj) {
 			result = Eval(v.Consequence, env)
 		} else {
 			if v.Alternative != nil {
@@ -316,7 +316,7 @@ func evalMinusPrefixExpression(right object.Object) object.Object {
 }
 
 func evalBangPrefixExpression(right object.Object) object.Object {
-	if isTruthy(right) {
+	if object.IsTruthy(right) {
 		return object.FALSE
 	}
 	return object.TRUE
@@ -414,15 +414,6 @@ func evalHashIndexExpression(iterable object.Object, index object.Object) object
 		} else {
 			return object.NULL
 		}
-	}
-}
-
-func isTruthy(obj object.Object) bool {
-	switch obj {
-	case object.NULL, object.FALSE:
-		return false
-	default:
-		return true
 	}
 }
 

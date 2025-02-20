@@ -43,17 +43,187 @@ func (svm *StackVM) Run() error {
 			obj := svm.constantPool[idx]
 			svm.push(obj)
 			ip += 1 + 2
-		case bytecode.OpAdd:
-			right := svm.pop()
-			left := svm.pop()
-
-			//TODO: Assuming these are integers. Generalise.
-			res := left.(*object.Integer).Value + right.(*object.Integer).Value
-			svm.push(&object.Integer{Value: res})
+		case bytecode.OpPushTrue:
+			svm.push(object.TRUE)
 			ip += 1
+		case bytecode.OpPushFalse:
+			svm.push(object.FALSE)
+			ip += 1
+		case bytecode.OpAdd, bytecode.OpSub, bytecode.OpMul, bytecode.OpDiv, bytecode.OpEqual, bytecode.OpNotEqual, bytecode.OpGT:
+			err := svm.executeBinaryOperation(opcode)
+			if err != nil {
+				return err
+			}
+			ip += 1
+		case bytecode.OpNegateBoolean, bytecode.OpNegateNumber:
+			err := svm.executeUnaryOperation(opcode)
+			if err != nil {
+				return err
+			}
+			ip += 1
+		default:
+			return fmt.Errorf("unknown opcode: %d", opcode)
 		}
 	}
 	return nil
+}
+
+func (svm *StackVM) executeUnaryOperation(opcode bytecode.OpCode) error {
+	operand := svm.pop()
+
+	switch opcode {
+	case bytecode.OpNegateNumber:
+		return svm.executeNegateNumberUnaryOperation(operand)
+	case bytecode.OpNegateBoolean:
+		return svm.executeNegateBooleanUnaryOperation(operand)
+	}
+	return nil
+}
+
+func (svm *StackVM) executeNegateNumberUnaryOperation(operand object.Object) error {
+	if i, ok := operand.(*object.Integer); ok {
+		svm.push(&object.Integer{Value: -i.Value})
+		return nil
+	} else {
+		return fmt.Errorf("invalid type %s with operator '-'", operand.Type())
+	}
+}
+
+func (svm *StackVM) executeNegateBooleanUnaryOperation(operand object.Object) error {
+	if object.IsTruthy(operand) {
+		svm.push(object.FALSE)
+	} else {
+		svm.push(object.TRUE)
+	}
+	return nil
+}
+
+func (svm *StackVM) executeBinaryOperation(opcode bytecode.OpCode) error {
+	right := svm.pop()
+	left := svm.pop()
+
+	// check for type mismatch
+	if left.Type() != right.Type() {
+		return fmt.Errorf("incompatible types: %s and %s", left.Type(), right.Type())
+	}
+
+	switch opcode {
+	case bytecode.OpAdd:
+		return svm.executeAddBinaryOperation(left, right)
+	case bytecode.OpSub:
+		return svm.executeSubBinaryOperation(left, right)
+	case bytecode.OpMul:
+		return svm.executeMulBinaryOperation(left, right)
+	case bytecode.OpDiv:
+		return svm.executeDivBinaryOperation(left, right)
+	case bytecode.OpEqual:
+		return svm.executeEqualsBinaryOperation(left, right)
+	case bytecode.OpNotEqual:
+		return svm.executeNotEqualsBinaryOperation(left, right)
+	case bytecode.OpGT:
+		return svm.executeGreaterThanBinaryOperation(left, right)
+	}
+
+	return nil
+}
+
+func (svm *StackVM) executeAddBinaryOperation(left, right object.Object) error {
+	switch left.Type() {
+	case object.IntegerObject:
+		l := left.(*object.Integer)
+		r := right.(*object.Integer)
+		svm.push(&object.Integer{Value: l.Value + r.Value})
+	default:
+		return fmt.Errorf("unsupported operand type %s with '+'", left.Type())
+	}
+	return nil
+}
+
+func (svm *StackVM) executeSubBinaryOperation(left, right object.Object) error {
+	switch left.Type() {
+	case object.IntegerObject:
+		l := left.(*object.Integer)
+		r := right.(*object.Integer)
+		svm.push(&object.Integer{Value: l.Value - r.Value})
+	default:
+		return fmt.Errorf("unsupported operand type %s with '-'", left.Type())
+	}
+	return nil
+}
+
+func (svm *StackVM) executeMulBinaryOperation(left, right object.Object) error {
+	switch left.Type() {
+	case object.IntegerObject:
+		l := left.(*object.Integer)
+		r := right.(*object.Integer)
+		svm.push(&object.Integer{Value: l.Value * r.Value})
+	default:
+		return fmt.Errorf("unsupported operand type %s with '*'", left.Type())
+	}
+	return nil
+}
+
+func (svm *StackVM) executeDivBinaryOperation(left, right object.Object) error {
+	switch left.Type() {
+	case object.IntegerObject:
+		l := left.(*object.Integer)
+		r := right.(*object.Integer)
+		svm.push(&object.Integer{Value: l.Value / r.Value})
+	default:
+		return fmt.Errorf("unsupported operand type %s with '/'", left.Type())
+	}
+	return nil
+}
+
+func (svm *StackVM) executeEqualsBinaryOperation(left, right object.Object) error {
+	objType := left.Type()
+
+	switch objType {
+	case object.IntegerObject:
+		svm.push(getBooleanObject(left.(*object.Integer).Value == right.(*object.Integer).Value))
+	case object.StringObject:
+		svm.push(getBooleanObject(left.(*object.String).Value == right.(*object.String).Value))
+	case object.BooleanObject:
+		svm.push(getBooleanObject(left == right)) // pointer comparison
+	default:
+		return fmt.Errorf("unsupported operand type %s with '=='", left.Type())
+	}
+	return nil
+}
+
+func (svm *StackVM) executeNotEqualsBinaryOperation(left, right object.Object) error {
+	objType := left.Type()
+
+	switch objType {
+	case object.IntegerObject:
+		svm.push(getBooleanObject(left.(*object.Integer).Value != right.(*object.Integer).Value))
+	case object.StringObject:
+		svm.push(getBooleanObject(left.(*object.String).Value != right.(*object.String).Value))
+	case object.BooleanObject:
+		svm.push(getBooleanObject(left != right)) // pointer comparison
+	default:
+		return fmt.Errorf("unsupported operand type %s with '!='", left.Type())
+	}
+	return nil
+}
+
+func (svm *StackVM) executeGreaterThanBinaryOperation(left, right object.Object) error {
+	objType := left.Type()
+
+	switch objType {
+	case object.IntegerObject:
+		svm.push(getBooleanObject(left.(*object.Integer).Value > right.(*object.Integer).Value))
+	default:
+		return fmt.Errorf("unsupported operand type %s with '>'", left.Type())
+	}
+	return nil
+}
+
+func getBooleanObject(boolValue bool) object.Object {
+	if boolValue {
+		return object.TRUE
+	}
+	return object.FALSE
 }
 
 func (svm *StackVM) push(obj object.Object) error {

@@ -13,14 +13,71 @@ func TestRun(t *testing.T) {
 		expected string
 	}{
 		{"1+2", "3"},
+		{"6-2", "4"},
+		{"3*4", "12"},
+		{"6/3", "2"},
+
+		// Deeply nested expressions
+		{"(((1+2)*3)-4)/2", "2"},
+		{"(5*(3+(2*2)))", "35"},
+		{"(6/(2*(1+2)))", "1"},
+		{"((2+3)*(4+(5-2)))", "35"},
+
+		// Edge cases
+		{"(((1)))", "1"}, // Extra parentheses should have no effect
+		{"(0+((1+2)*3))", "9"},
+		{"(100/(10/(2*5)))", "100"},
+		{"((8-6)*(3+(4/2)))", "10"},
+
+		// Comparison Operators
+		{"1 == 1", "true"},
+		{"1 == 2", "false"},
+		{"5 != 3", "true"},
+		{"4 != 4", "false"},
+		{"10 > 5", "true"},
+		{"10 > 10", "false"},
+		{"3 < 7", "true"},
+		{"7 < 3", "false"},
+
+		// Nested Comparisons
+		{"(1+2) == (3)", "true"},
+		{"(10-5) > (2+2)", "true"},
+		{"(2*3) < (10-1)", "true"},
+		{"(4/2) != (2-1)", "true"},
+		{"(6/3) == (2-0)", "true"},
+		{"((2+3)*2) > ((4+1)*2)", "false"},
+		{"((5*2)/2) == ((4+1))", "true"},
+
+		// Prefix Operators
+		{"!true", "false"},
+		{"!false", "true"},
+		{"!1", "false"}, // Assuming truthy values like 1 evaluate to true
+		{"!0", "false"},
+		{"!!true", "true"},
+		{"!!false", "false"},
+		{"!!1", "true"},
+		{"!!0", "true"},
+
+		// Prefix Negative
+		{"-5", "-5"},
+		{"-(-5)", "5"},
+		{"-(3+2)", "-5"},
+		{"-1 + 2", "1"}, // Ensure correct order of evaluation
+		{"-(2*3)", "-6"},
+		{"-(10-5)", "-5"},
+		{"-(4/2)", "-2"},
+		{"-(-(-3))", "-3"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			compiler := testCompile(tt.input)
-			bytecode := compiler.Emit()
+			bytecode := compiler.Output()
 			vm := NewStackVM(bytecode.Instructions, bytecode.ConstantPool)
-			vm.Run()
+			err := vm.Run()
+			if err != nil {
+				t.Fatal(err)
+			}
 			obj := vm.Top()
 			if obj.Inspect() != tt.expected {
 				t.Errorf("Expected %s, got %s", tt.expected, obj.Inspect())

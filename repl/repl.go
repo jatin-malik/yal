@@ -61,7 +61,7 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		bytecode := compiler.Emit()
+		bytecode := compiler.Output()
 		vm := vm.NewStackVM(bytecode.Instructions, bytecode.ConstantPool)
 		err = vm.Run()
 		if err != nil {
