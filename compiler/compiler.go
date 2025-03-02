@@ -8,8 +8,9 @@ import (
 )
 
 type Compiler struct {
-	instructions bytecode.Instructions
-	constantPool []object.Object
+	instructions       bytecode.Instructions
+	constantPool       []object.Object
+	lastAddedInsOffset int
 }
 
 // ByteCode encloses the output of the compiler
@@ -36,11 +37,52 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 		}
+	case *ast.BlockStatement:
+		for _, stmt := range n.Statements {
+			err := compiler.Compile(stmt)
+			if err != nil {
+				return err
+			}
+		}
 	case *ast.ExpressionStatement:
 		err := compiler.Compile(n.Expr)
 		if err != nil {
 			return err
 		}
+	case *ast.IfElseConditional:
+		err := compiler.Compile(n.Condition)
+		if err != nil {
+			return err
+		}
+
+		compiler.emit(bytecode.OpJumpIfFalse, 9999)
+
+		conditionalJumpOffset := compiler.lastAddedInsOffset
+
+		err = compiler.Compile(n.Consequence)
+		if err != nil {
+			return err
+		}
+
+		compiler.emit(bytecode.OpJump, 9999)
+		jumpOffset := compiler.lastAddedInsOffset
+
+		// Back-patch conditional jump
+		newConditionalJumpIns, _ := bytecode.Make(bytecode.OpJumpIfFalse, len(compiler.instructions))
+		compiler.modifyInstruction(conditionalJumpOffset, newConditionalJumpIns)
+
+		if n.Alternative != nil {
+			err = compiler.Compile(n.Alternative)
+			if err != nil {
+				return err
+			}
+		} else {
+			compiler.emit(bytecode.OpPushNull)
+		}
+
+		newJumpIns, _ := bytecode.Make(bytecode.OpJump, len(compiler.instructions))
+		compiler.modifyInstruction(jumpOffset, newJumpIns)
+
 	case *ast.PrefixExpression:
 		err := compiler.Compile(n.Right)
 		if err != nil {
@@ -121,9 +163,15 @@ func (compiler *Compiler) addConstant(obj object.Object) int {
 	return len(compiler.constantPool) - 1
 }
 
-// addInstruction adds input instruction to the compiler instructions
+// addInstruction appends input instruction to the compiler instructions and returns the insert offset.
 func (compiler *Compiler) addInstruction(ins []byte) {
+	insertPos := len(compiler.instructions)
 	compiler.instructions = append(compiler.instructions, ins...)
+	compiler.lastAddedInsOffset = insertPos
+}
+
+func (compiler *Compiler) modifyInstruction(offset int, newInstruction []byte) {
+	copy(compiler.instructions[offset:], newInstruction)
 }
 
 // Output wraps compiler output in ByteCode struct and returns it

@@ -49,6 +49,9 @@ func (svm *StackVM) Run() error {
 		case bytecode.OpPushFalse:
 			svm.push(object.FALSE)
 			ip += 1
+		case bytecode.OpPushNull:
+			svm.push(object.NULL)
+			ip += 1
 		case bytecode.OpAdd, bytecode.OpSub, bytecode.OpMul, bytecode.OpDiv, bytecode.OpEqual, bytecode.OpNotEqual, bytecode.OpGT:
 			err := svm.executeBinaryOperation(opcode)
 			if err != nil {
@@ -61,6 +64,17 @@ func (svm *StackVM) Run() error {
 				return err
 			}
 			ip += 1
+		case bytecode.OpJumpIfFalse:
+			jumpTo := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			if !object.IsTruthy(svm.Top()) {
+				ip = int(jumpTo)
+			} else {
+				ip += 1 + 2
+			}
+
+		case bytecode.OpJump:
+			jumpTo := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			ip = int(jumpTo)
 		default:
 			return fmt.Errorf("unknown opcode: %d", opcode)
 		}
