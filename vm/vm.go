@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	StackSize int = 2048
+	StackSize   int = 2048
+	GlobalsSize int = 65536
 )
 
 // VM mimics a real machine. It emulates the fetch-decode-execute cycle of a real machine and operates upon bytecode.
@@ -20,17 +21,35 @@ type VM interface {
 type StackVM struct {
 	instructions bytecode.Instructions
 	constantPool []object.Object
+	globals      []object.Object
 
 	stack []object.Object
 	sp    int // sp always points to the next available slot in stack
 }
 
-func NewStackVM(instructions bytecode.Instructions, constantPool []object.Object) *StackVM {
-	return &StackVM{
+type StackVMOption func(*StackVM)
+
+// WithGlobals allows setting a custom globals array.
+func WithGlobals(globals []object.Object) StackVMOption {
+	return func(vm *StackVM) {
+		vm.globals = globals
+	}
+}
+
+func NewStackVM(instructions bytecode.Instructions, constantPool []object.Object, options ...StackVMOption) *StackVM {
+	vm := &StackVM{
 		constantPool: constantPool,
 		stack:        make([]object.Object, StackSize),
 		instructions: instructions,
+		globals:      make([]object.Object, GlobalsSize),
 	}
+
+	// Apply provided options
+	for _, option := range options {
+		option(vm)
+	}
+
+	return vm
 }
 
 func (svm *StackVM) Run() error {
@@ -75,6 +94,15 @@ func (svm *StackVM) Run() error {
 		case bytecode.OpJump:
 			jumpTo := binary.BigEndian.Uint16(svm.instructions[ip+1:])
 			ip = int(jumpTo)
+		case bytecode.OpSetGlobal:
+			idx := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			svm.globals[idx] = svm.pop()
+			ip += 1 + 2
+		case bytecode.OpGetGlobal:
+			idx := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			obj := svm.globals[idx]
+			svm.push(obj)
+			ip += 1 + 2
 		default:
 			return fmt.Errorf("unknown opcode: %d", opcode)
 		}

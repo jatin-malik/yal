@@ -11,6 +11,7 @@ type Compiler struct {
 	instructions       bytecode.Instructions
 	constantPool       []object.Object
 	lastAddedInsOffset int
+	symbolTable        *SymbolTable
 }
 
 // ByteCode encloses the output of the compiler
@@ -19,11 +20,28 @@ type ByteCode struct {
 	ConstantPool []object.Object
 }
 
-func New() *Compiler {
-	return &Compiler{
+type Option func(*Compiler)
+
+// WithSymbolTable allows setting a custom symbol table.
+func WithSymbolTable(symTable *SymbolTable) Option {
+	return func(c *Compiler) {
+		c.symbolTable = symTable
+	}
+}
+
+func New(options ...Option) *Compiler {
+	compiler := &Compiler{
 		instructions: bytecode.Instructions{},
 		constantPool: []object.Object{},
+		symbolTable:  NewSymbolTable(),
 	}
+
+	// Apply provided options
+	for _, option := range options {
+		option(compiler)
+	}
+
+	return compiler
 }
 
 // Compile walks through the input AST and generates bytecode. It also populates the constant pool as it evaluates self
@@ -44,6 +62,14 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 		}
+	case *ast.LetStatement:
+		err := compiler.Compile(n.Right)
+		if err != nil {
+			return err
+		}
+
+		symbol := compiler.symbolTable.Define(n.Name.Value)
+		compiler.emit(bytecode.OpSetGlobal, symbol.Index)
 	case *ast.ExpressionStatement:
 		err := compiler.Compile(n.Expr)
 		if err != nil {
@@ -142,7 +168,12 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 				return fmt.Errorf("unknown operator %s", n.Operator)
 			}
 		}
-
+	case *ast.Identifier:
+		symbol, exists := compiler.symbolTable.Lookup(n.Value)
+		if !exists {
+			return fmt.Errorf("unknown identifier %s", n.Value)
+		}
+		compiler.emit(bytecode.OpGetGlobal, symbol.Index)
 	case *ast.IntegerLiteral:
 		obj := &object.Integer{Value: n.Value}
 		idx := compiler.addConstant(obj)

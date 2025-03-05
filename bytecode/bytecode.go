@@ -26,6 +26,8 @@ const (
 	OpJumpIfFalse
 	OpJump
 	OpPushNull
+	OpSetGlobal
+	OpGetGlobal
 )
 
 func (op OpCode) String() string {
@@ -58,6 +60,12 @@ func (op OpCode) String() string {
 		return "OpJumpIfFalse"
 	case OpJump:
 		return "OpJump"
+	case OpPushNull:
+		return "OpPushNull"
+	case OpSetGlobal:
+		return "OpSetGlobal"
+	case OpGetGlobal:
+		return "OpGetGlobal"
 	default:
 		return fmt.Sprintf("OpCode(%d)", op)
 	}
@@ -69,7 +77,7 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 	var instructions bytes.Buffer
 	instructions.WriteByte(byte(opCode))
 	switch opCode {
-	case OpPush, OpJumpIfFalse, OpJump:
+	case OpPush, OpJumpIfFalse, OpJump, OpSetGlobal, OpGetGlobal:
 		if len(operands) != 1 {
 			return nil, fmt.Errorf("%s needs one operand", opCode)
 		}

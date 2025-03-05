@@ -75,14 +75,21 @@ func TestRun(t *testing.T) {
 		{`if (5 > 3) { 10 };6+1`, "7"},
 		{`if (5 > 8) { 10 };2+1`, "3"},
 		{`if (5 > 8) { 10 }`, "null"},
+
+		{`let x = 5 ; x`, "5"},
+		{`let x = 5 ; x+2`, "7"},
+		{`let x = 5 ; let x = 10; x + 4`, "14"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			compiler := testCompile(tt.input)
+			compiler, err := testCompile(tt.input)
+			if err != nil {
+				t.Fatal(err)
+			}
 			bytecode := compiler.Output()
 			vm := NewStackVM(bytecode.Instructions, bytecode.ConstantPool)
-			err := vm.Run()
+			err = vm.Run()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -94,12 +101,15 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func testCompile(input string) *compiler.Compiler {
+func testCompile(input string) (*compiler.Compiler, error) {
 	lexer := lexer.New(input)
 	parser := parser.New(lexer)
 	program := parser.ParseProgram()
 
 	compiler := compiler.New()
-	compiler.Compile(program)
-	return compiler
+	err := compiler.Compile(program)
+	if err != nil {
+		return nil, err
+	}
+	return compiler, nil
 }

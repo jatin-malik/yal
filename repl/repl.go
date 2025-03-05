@@ -20,6 +20,8 @@ func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 	macroEnv := object.NewEnvironment(nil) // shared scope across all macro expansions
 	//env := object.NewEnvironment(nil)      // shared scope across all REPL statements evaluation
+	symTable := compiler.NewSymbolTable()
+	globals := make([]object.Object, 100)
 	for {
 		_, _ = io.WriteString(out, prompt)
 		// Read
@@ -54,7 +56,7 @@ func Start(in io.Reader, out io.Writer) {
 
 		//obj := evaluator.Eval(expandedAST, env)
 
-		compiler := compiler.New()
+		compiler := compiler.New(compiler.WithSymbolTable(symTable))
 		err = compiler.Compile(expandedAST)
 		if err != nil {
 			_, _ = io.WriteString(out, err.Error()+"\n")
@@ -62,7 +64,7 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		bytecode := compiler.Output()
-		vm := vm.NewStackVM(bytecode.Instructions, bytecode.ConstantPool)
+		vm := vm.NewStackVM(bytecode.Instructions, bytecode.ConstantPool, vm.WithGlobals(globals))
 		err = vm.Run()
 		if err != nil {
 			_, _ = io.WriteString(out, err.Error()+"\n")
