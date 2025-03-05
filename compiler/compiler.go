@@ -109,6 +109,39 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		newJumpIns, _ := bytecode.Make(bytecode.OpJump, len(compiler.instructions))
 		compiler.modifyInstruction(jumpOffset, newJumpIns)
 
+	case *ast.ArrayLiteral:
+		for _, element := range n.Elements {
+			err := compiler.Compile(element)
+			if err != nil {
+				return err
+			}
+		}
+
+		compiler.emit(bytecode.OpArray, len(n.Elements))
+	case *ast.HashLiteral:
+		for k, v := range n.Pairs {
+			err := compiler.Compile(v)
+			if err != nil {
+				return err
+			}
+			err = compiler.Compile(k)
+			if err != nil {
+				return err
+			}
+		}
+
+		compiler.emit(bytecode.OpHash, len(n.Pairs))
+	case *ast.IndexExpression:
+		err := compiler.Compile(n.Left)
+		if err != nil {
+			return err
+		}
+		err = compiler.Compile(n.Index)
+		if err != nil {
+			return err
+		}
+
+		compiler.emit(bytecode.OpIndex)
 	case *ast.PrefixExpression:
 		err := compiler.Compile(n.Right)
 		if err != nil {
@@ -176,6 +209,10 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		compiler.emit(bytecode.OpGetGlobal, symbol.Index)
 	case *ast.IntegerLiteral:
 		obj := &object.Integer{Value: n.Value}
+		idx := compiler.addConstant(obj)
+		compiler.emit(bytecode.OpPush, idx)
+	case *ast.StringLiteral:
+		obj := &object.String{Value: n.Value}
 		idx := compiler.addConstant(obj)
 		compiler.emit(bytecode.OpPush, idx)
 	case *ast.BooleanLiteral:

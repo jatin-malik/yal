@@ -103,6 +103,28 @@ func (svm *StackVM) Run() error {
 			obj := svm.globals[idx]
 			svm.push(obj)
 			ip += 1 + 2
+		case bytecode.OpArray:
+			count := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			arr := svm.buildArray(int(count))
+			svm.push(arr)
+			ip += 1 + 2
+		case bytecode.OpHash:
+			count := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			hash, err := svm.buildHash(int(count))
+			if err != nil {
+				return err
+			}
+			svm.push(hash)
+			ip += 1 + 2
+		case bytecode.OpIndex:
+			idx := svm.pop()
+			iterable := svm.pop()
+			obj, err := evalIndexExpression(iterable, idx)
+			if err != nil {
+				return err
+			}
+			svm.push(obj)
+			ip += 1
 		default:
 			return fmt.Errorf("unknown opcode: %d", opcode)
 		}
@@ -175,6 +197,10 @@ func (svm *StackVM) executeAddBinaryOperation(left, right object.Object) error {
 		l := left.(*object.Integer)
 		r := right.(*object.Integer)
 		svm.push(&object.Integer{Value: l.Value + r.Value})
+	case object.StringObject:
+		l := left.(*object.String)
+		r := right.(*object.String)
+		svm.push(&object.String{Value: l.Value + r.Value})
 	default:
 		return fmt.Errorf("unsupported operand type %s with '+'", left.Type())
 	}
@@ -295,4 +321,80 @@ func (svm *StackVM) Top() object.Object {
 
 	obj := svm.stack[svm.sp-1]
 	return obj
+}
+
+func (svm *StackVM) buildArray(count int) object.Object {
+	objs := make([]object.Object, count)
+	for count > 0 {
+		objs[count-1] = svm.pop()
+		count--
+	}
+	return &object.Array{Elements: objs}
+}
+
+func (svm *StackVM) buildHash(count int) (object.Object, error) {
+	pairs := make(map[object.Object]object.Object)
+
+	for count > 0 {
+		pairs[svm.pop()] = svm.pop()
+		count--
+	}
+
+	ho := new(object.Hash)
+	elems := make(map[object.HashKey]object.Object)
+	for k, v := range pairs {
+		// Check if key is hashable
+		if key, ok := k.(object.Hashable); !ok {
+			return nil, fmt.Errorf("key type %s is not hashable", k.Type())
+		} else {
+			hashKey := key.HashKey()
+			elems[hashKey] = v
+		}
+	}
+	ho.Pairs = elems
+	return ho, nil
+}
+
+func evalIndexExpression(iterable object.Object, index object.Object) (object.Object, error) {
+	switch iterable.Type() {
+	case object.ArrayObject:
+		return evalArrayIndexExpression(iterable, index)
+	case object.HashObject:
+		return evalHashIndexExpression(iterable, index)
+	default:
+		return nil, fmt.Errorf("index expression not supported for type: %s", iterable.Type())
+	}
+}
+
+func evalArrayIndexExpression(iterable object.Object, index object.Object) (object.Object, error) {
+	arr := iterable.(*object.Array)
+
+	// The index has to be an integer
+	if i, ok := index.(*object.Integer); !ok {
+		return nil, fmt.Errorf("index must be an integer for index expression in arrays")
+	} else {
+		// Check bounds of the index
+		idx := i.Value
+		if idx < 0 || idx >= int64(len(arr.Elements)) {
+			return nil, fmt.Errorf("index %d out of bounds for arr length %d", idx, len(arr.Elements))
+		}
+
+		return arr.Elements[idx], nil
+	}
+
+}
+
+func evalHashIndexExpression(iterable object.Object, index object.Object) (object.Object, error) {
+	hash := iterable.(*object.Hash)
+	// Check if key is hashable
+	if key, ok := index.(object.Hashable); !ok {
+		return nil, fmt.Errorf("key type %s is not hashable", index.Type())
+	} else {
+		hashKey := key.HashKey()
+		if val, ok := hash.Pairs[hashKey]; ok {
+			return val, nil
+		} else {
+			return object.NULL, nil
+		}
+	}
 }

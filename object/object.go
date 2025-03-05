@@ -137,20 +137,20 @@ func (hash *Hash) Type() ObjectType {
 }
 
 func (hash *Hash) Inspect() string {
-	return "TODO"
-	//var out bytes.Buffer
-	//pairs := make(map[Object]Object)
-	//for k, v := range hash.Pairs {
-	//	pairs[k] = v
-	//}
-	//out.WriteString("{")
-	//for k, v := range pairs {
-	//	out.WriteString(k.Inspect())
-	//	out.WriteString(":")
-	//	out.WriteString(v.Inspect())
-	//}
-	//out.WriteString("}")
-	//return out.String()
+	var out bytes.Buffer
+	out.WriteString("{")
+	count := 0
+	for k, v := range hash.Pairs {
+		out.WriteString(k.Value)
+		out.WriteString(":")
+		out.WriteString(v.Inspect())
+		if count != len(hash.Pairs)-1 {
+			out.WriteString(", ")
+		}
+		count++
+	}
+	out.WriteString("}")
+	return out.String()
 }
 
 type Function struct {

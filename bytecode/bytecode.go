@@ -28,6 +28,9 @@ const (
 	OpPushNull
 	OpSetGlobal
 	OpGetGlobal
+	OpArray
+	OpHash
+	OpIndex
 )
 
 func (op OpCode) String() string {
@@ -66,6 +69,12 @@ func (op OpCode) String() string {
 		return "OpSetGlobal"
 	case OpGetGlobal:
 		return "OpGetGlobal"
+	case OpArray:
+		return "OpArray"
+	case OpHash:
+		return "OpHash"
+	case OpIndex:
+		return "OpIndex"
 	default:
 		return fmt.Sprintf("OpCode(%d)", op)
 	}
@@ -77,7 +86,7 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 	var instructions bytes.Buffer
 	instructions.WriteByte(byte(opCode))
 	switch opCode {
-	case OpPush, OpJumpIfFalse, OpJump, OpSetGlobal, OpGetGlobal:
+	case OpPush, OpJumpIfFalse, OpJump, OpSetGlobal, OpGetGlobal, OpArray, OpHash:
 		if len(operands) != 1 {
 			return nil, fmt.Errorf("%s needs one operand", opCode)
 		}
@@ -86,7 +95,7 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 		binary.BigEndian.PutUint16(operandBytes[:], uint16(idx))
 		instructions.Write(operandBytes[:])
 	case OpAdd, OpSub, OpMul, OpDiv, OpPushTrue, OpPushFalse, OpEqual, OpNotEqual, OpGT, OpNegateBoolean,
-		OpNegateNumber, OpPushNull:
+		OpNegateNumber, OpPushNull, OpIndex:
 	default:
 		return nil, fmt.Errorf("unknown opcode: %d", opCode)
 	}

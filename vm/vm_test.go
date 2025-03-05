@@ -79,6 +79,29 @@ func TestRun(t *testing.T) {
 		{`let x = 5 ; x`, "5"},
 		{`let x = 5 ; x+2`, "7"},
 		{`let x = 5 ; let x = 10; x + 4`, "14"},
+
+		// String literals
+		{`"hello"`, "hello"},
+		{`"world"`, "world"},
+
+		// String concatenation
+		{`"hello" + " " + "world"`, "hello world"},
+		{`"foo" + "bar"`, "foobar"},
+		{`"Go" + "lang"`, "Golang"},
+
+		// Array literals
+		{`[1, 2, 3]`, "[1, 2, 3]"},
+		{`[10, 20, 30][1]`, "20"},
+		{`let arr = [5, 10, 15]; arr[2]`, "15"},
+		{`[1 + 1, 2 * 2, 3 - 1]`, "[2, 4, 2]"},
+		{`let x = [1, 2, 3]; x[0] + x[2]`, "4"},
+
+		// Hash literals
+		{`{"key": "value"}`, "{key:value}"},
+		{`{"name": "Alice", "age": 25}["name"]`, "Alice"},
+		{`let h = {"a": 1, "b": 2}; h["b"]`, "2"},
+		{`{"x": 10, "y": 20}["y"]`, "20"},
+		{`let m = {1: "one", 2: "two"}; m[1]`, "one"},
 	}
 
 	for _, tt := range tests {
