@@ -4,23 +4,25 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/jatin-malik/yal/ast"
+	"github.com/jatin-malik/yal/bytecode"
 	"strings"
 )
 
 type ObjectType string
 
 const (
-	IntegerObject     ObjectType = "INTEGER"
-	BooleanObject     ObjectType = "BOOLEAN"
-	NullObject        ObjectType = "NULL"
-	ReturnValueObject ObjectType = "RETURN_VALUE"
-	ErrorValueObject  ObjectType = "ERROR"
-	FunctionObject    ObjectType = "FUNCTION"
-	MacroObject       ObjectType = "MACRO"
-	StringObject      ObjectType = "STRING"
-	ArrayObject       ObjectType = "ARRAY"
-	HashObject        ObjectType = "HASH"
-	QuoteObject       ObjectType = "QUOTE"
+	IntegerObject          ObjectType = "INTEGER"
+	BooleanObject          ObjectType = "BOOLEAN"
+	NullObject             ObjectType = "NULL"
+	ReturnValueObject      ObjectType = "RETURN_VALUE"
+	ErrorValueObject       ObjectType = "ERROR"
+	FunctionObject         ObjectType = "FUNCTION"
+	CompiledFunctionObject ObjectType = "COMPILED_FUNCTION"
+	MacroObject            ObjectType = "MACRO"
+	StringObject           ObjectType = "STRING"
+	ArrayObject            ObjectType = "ARRAY"
+	HashObject             ObjectType = "HASH"
+	QuoteObject            ObjectType = "QUOTE"
 )
 
 var (
@@ -151,6 +153,18 @@ func (hash *Hash) Inspect() string {
 	}
 	out.WriteString("}")
 	return out.String()
+}
+
+type CompiledFunction struct {
+	Instructions bytecode.Instructions
+}
+
+func (compiledFunction *CompiledFunction) Type() ObjectType {
+	return CompiledFunctionObject
+}
+
+func (compiledFunction *CompiledFunction) Inspect() string {
+	return fmt.Sprintf("COMPILED_FUNCTION(%p)", compiledFunction)
 }
 
 type Function struct {

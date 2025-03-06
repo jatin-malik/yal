@@ -10,6 +10,7 @@ import (
 const (
 	StackSize   int = 2048
 	GlobalsSize int = 65536
+	FramesSize  int = 1024
 )
 
 // VM mimics a real machine. It emulates the fetch-decode-execute cycle of a real machine and operates upon bytecode.
@@ -17,11 +18,23 @@ type VM interface {
 	Run() error
 }
 
+type Frame struct {
+	instructions bytecode.Instructions
+	ip           int
+}
+
+func NewFrame(instructions bytecode.Instructions) *Frame {
+	return &Frame{
+		instructions: instructions,
+	}
+}
+
 // StackVM is a stack based VM.
 type StackVM struct {
-	instructions bytecode.Instructions
-	constantPool []object.Object
-	globals      []object.Object
+	frames         []*Frame
+	activeFrameIdx int
+	constantPool   []object.Object
+	globals        []object.Object
 
 	stack []object.Object
 	sp    int // sp always points to the next available slot in stack
@@ -37,10 +50,13 @@ func WithGlobals(globals []object.Object) StackVMOption {
 }
 
 func NewStackVM(instructions bytecode.Instructions, constantPool []object.Object, options ...StackVMOption) *StackVM {
+	mainFrame := NewFrame(instructions)
+	frames := make([]*Frame, FramesSize)
+	frames[0] = mainFrame
 	vm := &StackVM{
 		constantPool: constantPool,
 		stack:        make([]object.Object, StackSize),
-		instructions: instructions,
+		frames:       frames,
 		globals:      make([]object.Object, GlobalsSize),
 	}
 
@@ -53,69 +69,71 @@ func NewStackVM(instructions bytecode.Instructions, constantPool []object.Object
 }
 
 func (svm *StackVM) Run() error {
-	for ip := 0; ip < len(svm.instructions); {
-		opcode := bytecode.OpCode(svm.instructions[ip]) // Fetch
+	for svm.frames[svm.activeFrameIdx].ip < len(svm.frames[svm.activeFrameIdx].instructions) {
+		activeFrame := svm.frames[svm.activeFrameIdx]
+
+		opcode := bytecode.OpCode(activeFrame.instructions[activeFrame.ip]) // Fetch
 
 		switch opcode { // Decode
 		case bytecode.OpPush:
-			idx := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			obj := svm.constantPool[idx]
 			svm.push(obj)
-			ip += 1 + 2
+			activeFrame.ip += 1 + 2
 		case bytecode.OpPushTrue:
 			svm.push(object.TRUE)
-			ip += 1
+			activeFrame.ip += 1
 		case bytecode.OpPushFalse:
 			svm.push(object.FALSE)
-			ip += 1
+			activeFrame.ip += 1
 		case bytecode.OpPushNull:
 			svm.push(object.NULL)
-			ip += 1
+			activeFrame.ip += 1
 		case bytecode.OpAdd, bytecode.OpSub, bytecode.OpMul, bytecode.OpDiv, bytecode.OpEqual, bytecode.OpNotEqual, bytecode.OpGT:
 			err := svm.executeBinaryOperation(opcode)
 			if err != nil {
 				return err
 			}
-			ip += 1
+			activeFrame.ip += 1
 		case bytecode.OpNegateBoolean, bytecode.OpNegateNumber:
 			err := svm.executeUnaryOperation(opcode)
 			if err != nil {
 				return err
 			}
-			ip += 1
+			activeFrame.ip += 1
 		case bytecode.OpJumpIfFalse:
-			jumpTo := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			jumpTo := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			if !object.IsTruthy(svm.Top()) {
-				ip = int(jumpTo)
+				activeFrame.ip = int(jumpTo)
 			} else {
-				ip += 1 + 2
+				activeFrame.ip += 1 + 2
 			}
 
 		case bytecode.OpJump:
-			jumpTo := binary.BigEndian.Uint16(svm.instructions[ip+1:])
-			ip = int(jumpTo)
+			jumpTo := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
+			activeFrame.ip = int(jumpTo)
 		case bytecode.OpSetGlobal:
-			idx := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			svm.globals[idx] = svm.pop()
-			ip += 1 + 2
+			activeFrame.ip += 1 + 2
 		case bytecode.OpGetGlobal:
-			idx := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			obj := svm.globals[idx]
 			svm.push(obj)
-			ip += 1 + 2
+			activeFrame.ip += 1 + 2
 		case bytecode.OpArray:
-			count := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			count := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			arr := svm.buildArray(int(count))
 			svm.push(arr)
-			ip += 1 + 2
+			activeFrame.ip += 1 + 2
 		case bytecode.OpHash:
-			count := binary.BigEndian.Uint16(svm.instructions[ip+1:])
+			count := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			hash, err := svm.buildHash(int(count))
 			if err != nil {
 				return err
 			}
 			svm.push(hash)
-			ip += 1 + 2
+			activeFrame.ip += 1 + 2
 		case bytecode.OpIndex:
 			idx := svm.pop()
 			iterable := svm.pop()
@@ -124,7 +142,15 @@ func (svm *StackVM) Run() error {
 				return err
 			}
 			svm.push(obj)
-			ip += 1
+			activeFrame.ip += 1
+		case bytecode.OpCall:
+			// Execute the compiled function sitting on top of the stack
+			compiledFn := svm.pop()
+			activeFrame.ip += 1
+			svm.pushFrame(compiledFn)
+		case bytecode.OpReturnValue:
+			svm.popFrame()
+			// clean up stack
 		default:
 			return fmt.Errorf("unknown opcode: %d", opcode)
 		}
@@ -321,6 +347,17 @@ func (svm *StackVM) Top() object.Object {
 
 	obj := svm.stack[svm.sp-1]
 	return obj
+}
+
+func (svm *StackVM) pushFrame(compiledFn object.Object) {
+	fn := compiledFn.(*object.CompiledFunction)
+	frame := NewFrame(fn.Instructions)
+	svm.frames[svm.activeFrameIdx+1] = frame
+	svm.activeFrameIdx++
+}
+
+func (svm *StackVM) popFrame() {
+	svm.activeFrameIdx--
 }
 
 func (svm *StackVM) buildArray(count int) object.Object {

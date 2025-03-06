@@ -7,11 +7,22 @@ import (
 	"github.com/jatin-malik/yal/object"
 )
 
-type Compiler struct {
+type CompilationScope struct {
 	instructions       bytecode.Instructions
-	constantPool       []object.Object
 	lastAddedInsOffset int
-	symbolTable        *SymbolTable
+}
+
+func NewCompilationScope() *CompilationScope {
+	return &CompilationScope{
+		instructions: bytecode.Instructions{},
+	}
+}
+
+type Compiler struct {
+	scopes         []*CompilationScope
+	activeScopeIdx int
+	constantPool   []object.Object
+	symbolTable    *SymbolTable
 }
 
 // ByteCode encloses the output of the compiler
@@ -30,8 +41,10 @@ func WithSymbolTable(symTable *SymbolTable) Option {
 }
 
 func New(options ...Option) *Compiler {
+	var scopes []*CompilationScope
+	scopes = append(scopes, NewCompilationScope())
 	compiler := &Compiler{
-		instructions: bytecode.Instructions{},
+		scopes:       scopes,
 		constantPool: []object.Object{},
 		symbolTable:  NewSymbolTable(),
 	}
@@ -44,9 +57,10 @@ func New(options ...Option) *Compiler {
 	return compiler
 }
 
-// Compile walks through the input AST and generates bytecode. It also populates the constant pool as it evaluates self
-// evaluating literals in the AST. It returns an error in case compilation fails.
+// Compile walks through the input AST and generates bytecode. It also populates the constant pool as it evaluates
+// constant literals in the AST. It returns an error in case compilation fails.
 func (compiler *Compiler) Compile(node ast.Node) error {
+	activeScope := compiler.scopes[compiler.activeScopeIdx]
 	switch n := node.(type) {
 	case *ast.Program:
 		for _, stmt := range n.Statements {
@@ -70,6 +84,12 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 
 		symbol := compiler.symbolTable.Define(n.Name.Value)
 		compiler.emit(bytecode.OpSetGlobal, symbol.Index)
+	case *ast.ReturnStatement:
+		err := compiler.Compile(n.Value)
+		if err != nil {
+			return err
+		}
+		compiler.emit(bytecode.OpReturnValue)
 	case *ast.ExpressionStatement:
 		err := compiler.Compile(n.Expr)
 		if err != nil {
@@ -83,7 +103,7 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 
 		compiler.emit(bytecode.OpJumpIfFalse, 9999)
 
-		conditionalJumpOffset := compiler.lastAddedInsOffset
+		conditionalJumpOffset := activeScope.lastAddedInsOffset
 
 		err = compiler.Compile(n.Consequence)
 		if err != nil {
@@ -91,10 +111,10 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		}
 
 		compiler.emit(bytecode.OpJump, 9999)
-		jumpOffset := compiler.lastAddedInsOffset
+		jumpOffset := activeScope.lastAddedInsOffset
 
 		// Back-patch conditional jump
-		newConditionalJumpIns, _ := bytecode.Make(bytecode.OpJumpIfFalse, len(compiler.instructions))
+		newConditionalJumpIns, _ := bytecode.Make(bytecode.OpJumpIfFalse, len(activeScope.instructions))
 		compiler.modifyInstruction(conditionalJumpOffset, newConditionalJumpIns)
 
 		if n.Alternative != nil {
@@ -106,7 +126,7 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 			compiler.emit(bytecode.OpPushNull)
 		}
 
-		newJumpIns, _ := bytecode.Make(bytecode.OpJump, len(compiler.instructions))
+		newJumpIns, _ := bytecode.Make(bytecode.OpJump, len(activeScope.instructions))
 		compiler.modifyInstruction(jumpOffset, newJumpIns)
 
 	case *ast.ArrayLiteral:
@@ -142,6 +162,35 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		}
 
 		compiler.emit(bytecode.OpIndex)
+	case *ast.FunctionLiteral:
+		compiler.enterScope()
+		activeScope := compiler.scopes[compiler.activeScopeIdx]
+		err := compiler.Compile(n.Body)
+		if err != nil {
+			return err
+		}
+
+		if len(activeScope.instructions) == 0 {
+			// empty function body
+			compiler.emit(bytecode.OpPushNull)
+			compiler.emit(bytecode.OpReturnValue)
+		}
+
+		if bytecode.OpCode(activeScope.instructions[activeScope.lastAddedInsOffset]) != bytecode.OpReturnValue {
+			// implicit return
+			compiler.emit(bytecode.OpReturnValue)
+		}
+		compiledInstructions := activeScope.instructions
+		compiler.exitScope()
+
+		compiledFunctionObj := &object.CompiledFunction{Instructions: compiledInstructions}
+		compiler.emit(bytecode.OpPush, compiler.addConstant(compiledFunctionObj))
+	case *ast.CallExpression:
+		err := compiler.Compile(n.Function)
+		if err != nil {
+			return err
+		}
+		compiler.emit(bytecode.OpCall)
 	case *ast.PrefixExpression:
 		err := compiler.Compile(n.Right)
 		if err != nil {
@@ -233,19 +282,20 @@ func (compiler *Compiler) addConstant(obj object.Object) int {
 
 // addInstruction appends input instruction to the compiler instructions and returns the insert offset.
 func (compiler *Compiler) addInstruction(ins []byte) {
-	insertPos := len(compiler.instructions)
-	compiler.instructions = append(compiler.instructions, ins...)
-	compiler.lastAddedInsOffset = insertPos
+	activeScope := compiler.scopes[compiler.activeScopeIdx]
+	insertPos := len(activeScope.instructions)
+	activeScope.instructions = append(activeScope.instructions, ins...)
+	activeScope.lastAddedInsOffset = insertPos
 }
 
 func (compiler *Compiler) modifyInstruction(offset int, newInstruction []byte) {
-	copy(compiler.instructions[offset:], newInstruction)
+	copy(compiler.scopes[compiler.activeScopeIdx].instructions[offset:], newInstruction)
 }
 
 // Output wraps compiler output in ByteCode struct and returns it
 func (compiler *Compiler) Output() ByteCode {
 	return ByteCode{
-		Instructions: compiler.instructions,
+		Instructions: compiler.scopes[compiler.activeScopeIdx].instructions,
 		ConstantPool: compiler.constantPool,
 	}
 }
@@ -257,4 +307,15 @@ func (compiler *Compiler) emit(op bytecode.OpCode, operands ...int) error {
 	}
 	compiler.addInstruction(ins)
 	return nil
+}
+
+func (compiler *Compiler) enterScope() {
+	scope := NewCompilationScope()
+	compiler.scopes = append(compiler.scopes, scope)
+	compiler.activeScopeIdx++
+}
+
+func (compiler *Compiler) exitScope() {
+	compiler.scopes = compiler.scopes[:compiler.activeScopeIdx]
+	compiler.activeScopeIdx--
 }

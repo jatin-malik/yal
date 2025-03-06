@@ -102,6 +102,41 @@ func TestRun(t *testing.T) {
 		{`let h = {"a": 1, "b": 2}; h["b"]`, "2"},
 		{`{"x": 10, "y": 20}["y"]`, "20"},
 		{`let m = {1: "one", 2: "two"}; m[1]`, "one"},
+
+		// Function Calls - Simple cases
+		{`let f = fn() { 5 }; f()`, "5"},                             // Explicit return
+		{`let f = fn() { return 10; }; f()`, "10"},                   // Explicit return with `return`
+		{`let f = fn() { 1+2 }; f()`, "3"},                           // Implicit return
+		{`let f = fn() { 2*3 }; f()`, "6"},                           // Implicit return with expression
+		{`let f = fn() {}; f()`, "null"},                             // Empty function body should return null
+		{`let f = fn() { if (true) { return 42; } }; f()`, "42"},     // Return inside conditional
+		{`let f = fn() { if (false) { return 42; } }; f()`, "null"},  // Branch with no return should return null
+		{`let f = fn() { 5 }; let g = fn() { f() }; g()`, "5"},       // Nested function calls
+		{`let f = fn() { 1+2 }; let g = fn() { f() * 2 }; g()`, "6"}, // Function calls within function
+
+		// Function assignment to multiple variables
+		{`let f = fn() { 10 }; let g = f; g()`, "10"},                       // Function aliasing
+		{`let f = fn() { 20 }; let g = fn() { f() }; let h = g; h()`, "20"}, // Function aliasing with calls
+
+		// Functions returning functions
+		{`let f = fn() { fn() { 99 } }; let g = f(); g()`, "99"}, // Function returning another function
+		{`let f = fn() { fn() {} }; let g = f(); g()`, "null"},   // Function returning empty function
+
+		// Calling function multiple times
+		{`let f = fn() { 5 }; f(); f(); f()`, "5"}, // Ensure multiple calls work
+
+		// Functions in expressions
+		{`let f = fn() { 4 }; f() + 2`, "6"},                           // Function return used in expression
+		{`let f = fn() { 10 }; let g = fn() { f() + f() }; g()`, "20"}, // Function calls inside expressions
+
+		// Function reassignments
+		{`let f = fn() { 10 }; let f = fn() { 20 }; f()`, "20"}, // Overwriting function
+
+		// Function calls in if-expressions
+		{`let f = fn() { 7 }; if (true) { f() }`, "7"},                               // Function inside if-true branch
+		{`let f = fn() { 8 }; if (false) { f() } else { 12 }`, "12"},                 // Function inside if-false branch
+		{`let f = fn() { if (true) { return 30; } else { return 40; } }; f()`, "30"}, // Function with full if-else
+
 	}
 
 	for _, tt := range tests {

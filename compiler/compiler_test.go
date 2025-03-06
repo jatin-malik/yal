@@ -144,7 +144,7 @@ func TestCompile(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
-			assertBytecode(t, tt.expectedByteCode, compiler.instructions)
+			assertBytecode(t, tt.expectedByteCode, compiler.scopes[compiler.activeScopeIdx].instructions)
 			assertConstantPool(t, tt.expectedConstantPool, compiler.constantPool)
 		})
 	}

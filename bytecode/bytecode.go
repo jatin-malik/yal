@@ -31,6 +31,8 @@ const (
 	OpArray
 	OpHash
 	OpIndex
+	OpCall
+	OpReturnValue
 )
 
 func (op OpCode) String() string {
@@ -75,6 +77,10 @@ func (op OpCode) String() string {
 		return "OpHash"
 	case OpIndex:
 		return "OpIndex"
+	case OpCall:
+		return "OpCall"
+	case OpReturnValue:
+		return "OpReturnValue"
 	default:
 		return fmt.Sprintf("OpCode(%d)", op)
 	}
@@ -95,7 +101,7 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 		binary.BigEndian.PutUint16(operandBytes[:], uint16(idx))
 		instructions.Write(operandBytes[:])
 	case OpAdd, OpSub, OpMul, OpDiv, OpPushTrue, OpPushFalse, OpEqual, OpNotEqual, OpGT, OpNegateBoolean,
-		OpNegateNumber, OpPushNull, OpIndex:
+		OpNegateNumber, OpPushNull, OpIndex, OpCall, OpReturnValue:
 	default:
 		return nil, fmt.Errorf("unknown opcode: %d", opCode)
 	}
