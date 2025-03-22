@@ -21,11 +21,13 @@ type VM interface {
 type Frame struct {
 	instructions bytecode.Instructions
 	ip           int
+	bp           int
 }
 
-func NewFrame(instructions bytecode.Instructions) *Frame {
+func NewFrame(instructions bytecode.Instructions, bp int) *Frame {
 	return &Frame{
 		instructions: instructions,
+		bp:           bp,
 	}
 }
 
@@ -50,7 +52,7 @@ func WithGlobals(globals []object.Object) StackVMOption {
 }
 
 func NewStackVM(instructions bytecode.Instructions, constantPool []object.Object, options ...StackVMOption) *StackVM {
-	mainFrame := NewFrame(instructions)
+	mainFrame := NewFrame(instructions, 0)
 	frames := make([]*Frame, FramesSize)
 	frames[0] = mainFrame
 	vm := &StackVM{
@@ -112,9 +114,20 @@ func (svm *StackVM) Run() error {
 		case bytecode.OpJump:
 			jumpTo := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			activeFrame.ip = int(jumpTo)
+		case bytecode.OpSetLocal:
+			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
+			localBindingsStackIdx := svm.frames[svm.activeFrameIdx].bp + int(idx)
+			svm.stack[localBindingsStackIdx] = svm.pop()
+			activeFrame.ip += 1 + 2
 		case bytecode.OpSetGlobal:
 			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			svm.globals[idx] = svm.pop()
+			activeFrame.ip += 1 + 2
+		case bytecode.OpGetLocal:
+			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
+			localBindingsStackIdx := svm.frames[svm.activeFrameIdx].bp + int(idx)
+			obj := svm.stack[localBindingsStackIdx]
+			svm.push(obj)
 			activeFrame.ip += 1 + 2
 		case bytecode.OpGetGlobal:
 			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
@@ -145,12 +158,15 @@ func (svm *StackVM) Run() error {
 			activeFrame.ip += 1
 		case bytecode.OpCall:
 			// Execute the compiled function sitting on top of the stack
-			compiledFn := svm.pop()
+			compiledFn := svm.pop().(*object.CompiledFunction)
 			activeFrame.ip += 1
-			svm.pushFrame(compiledFn)
+			svm.pushFrame(compiledFn, svm.sp)
+			svm.sp += compiledFn.NumLocals
 		case bytecode.OpReturnValue:
+			val := svm.pop()
+			svm.sp = svm.frames[svm.activeFrameIdx].bp // clean up activation record
 			svm.popFrame()
-			// clean up stack
+			svm.push(val)
 		default:
 			return fmt.Errorf("unknown opcode: %d", opcode)
 		}
@@ -349,9 +365,9 @@ func (svm *StackVM) Top() object.Object {
 	return obj
 }
 
-func (svm *StackVM) pushFrame(compiledFn object.Object) {
+func (svm *StackVM) pushFrame(compiledFn object.Object, bp int) {
 	fn := compiledFn.(*object.CompiledFunction)
-	frame := NewFrame(fn.Instructions)
+	frame := NewFrame(fn.Instructions, bp)
 	svm.frames[svm.activeFrameIdx+1] = frame
 	svm.activeFrameIdx++
 }

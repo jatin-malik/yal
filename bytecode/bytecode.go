@@ -33,6 +33,8 @@ const (
 	OpIndex
 	OpCall
 	OpReturnValue
+	OpSetLocal
+	OpGetLocal
 )
 
 func (op OpCode) String() string {
@@ -81,6 +83,10 @@ func (op OpCode) String() string {
 		return "OpCall"
 	case OpReturnValue:
 		return "OpReturnValue"
+	case OpSetLocal:
+		return "OpSetLocal"
+	case OpGetLocal:
+		return "OpGetLocal"
 	default:
 		return fmt.Sprintf("OpCode(%d)", op)
 	}
@@ -92,7 +98,7 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 	var instructions bytes.Buffer
 	instructions.WriteByte(byte(opCode))
 	switch opCode {
-	case OpPush, OpJumpIfFalse, OpJump, OpSetGlobal, OpGetGlobal, OpArray, OpHash:
+	case OpPush, OpJumpIfFalse, OpJump, OpSetGlobal, OpGetGlobal, OpArray, OpHash, OpSetLocal, OpGetLocal:
 		if len(operands) != 1 {
 			return nil, fmt.Errorf("%s needs one operand", opCode)
 		}

@@ -137,6 +137,31 @@ func TestRun(t *testing.T) {
 		{`let f = fn() { 8 }; if (false) { f() } else { 12 }`, "12"},                 // Function inside if-false branch
 		{`let f = fn() { if (true) { return 30; } else { return 40; } }; f()`, "30"}, // Function with full if-else
 
+		// Basic Local Variable Usage
+		{`let f = fn() { let x = 5; x }; f()`, "5"}, // Local variable is returned
+		{`let f = fn() { let x = 5; let x = 10; x }; f()`, "10"},
+		{`let f = fn() { let x = 10; return x; }; f()`, "10"}, // Explicit return of local variable
+		{`let f = fn() { let x = 2; x * 3 }; f()`, "6"},       // Local variable used in an expression
+
+		// Multiple Local Variables
+		{`let f = fn() { let a = 3; let b = 4; a + b }; f()`, "7"}, // Multiple local bindings
+		{`let f = fn() { let x = 2; let y = x + 5; y }; f()`, "7"}, // Variable referencing another local variable
+
+		// Shadowing Global Variables
+		{`let x = 100; let f = fn() { let x = 5; x }; f()`, "5"},       // Local variable shadows global
+		{`let x = 100; let f = fn() { let x = 5; x }; f(); x`, "100"},  // Global variable remains unchanged
+		{`let x = 100; let f = fn() { let x = x + 5; x }; f()`, "105"}, // Local variable initializes using global variable
+		{`let x = 100; let f = fn() { x + 5 }; f()`, "105"},            // Function accesses global variable
+		{`let x = 50; let f = fn() { let x = x + 10; x }; f()`, "60"},  // Function uses outer variable while shadowing
+
+		// Conditionals and Local Variables
+		{`let f = fn() { let x = 0; if (true) { let x = 10; x } else { x } }; f()`, "10"},              // Local variable inside if-block
+		{`let f = fn() { let x = 0; if (false) { let x = 10; x } else { let x = 20; x } }; f()`, "20"}, // Local variable in else-block
+
+		{`let returnsOneReturner = fn() {
+				let returnsOne = fn() { 1; };
+				returnsOne;};
+				returnsOneReturner()();`, "1"},
 	}
 
 	for _, tt := range tests {

@@ -20,7 +20,7 @@ func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 	macroEnv := object.NewEnvironment(nil) // shared scope across all macro expansions
 	//env := object.NewEnvironment(nil)      // shared scope across all REPL statements evaluation
-	symTable := compiler.NewSymbolTable()
+	symTable := compiler.NewSymbolTable(nil)
 	globals := make([]object.Object, 100)
 	for {
 		_, _ = io.WriteString(out, prompt)

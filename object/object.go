@@ -157,6 +157,7 @@ func (hash *Hash) Inspect() string {
 
 type CompiledFunction struct {
 	Instructions bytecode.Instructions
+	NumLocals    int
 }
 
 func (compiledFunction *CompiledFunction) Type() ObjectType {

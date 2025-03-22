@@ -46,7 +46,7 @@ func New(options ...Option) *Compiler {
 	compiler := &Compiler{
 		scopes:       scopes,
 		constantPool: []object.Object{},
-		symbolTable:  NewSymbolTable(),
+		symbolTable:  NewSymbolTable(nil),
 	}
 
 	// Apply provided options
@@ -83,7 +83,12 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		}
 
 		symbol := compiler.symbolTable.Define(n.Name.Value)
-		compiler.emit(bytecode.OpSetGlobal, symbol.Index)
+		if symbol.Scope == GLOBAL {
+			compiler.emit(bytecode.OpSetGlobal, symbol.Index)
+		} else {
+			compiler.emit(bytecode.OpSetLocal, symbol.Index)
+		}
+
 	case *ast.ReturnStatement:
 		err := compiler.Compile(n.Value)
 		if err != nil {
@@ -165,6 +170,10 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 	case *ast.FunctionLiteral:
 		compiler.enterScope()
 		activeScope := compiler.scopes[compiler.activeScopeIdx]
+
+		localSymbolTable := NewSymbolTable(compiler.symbolTable)
+		compiler.symbolTable = localSymbolTable
+
 		err := compiler.Compile(n.Body)
 		if err != nil {
 			return err
@@ -181,9 +190,14 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 			compiler.emit(bytecode.OpReturnValue)
 		}
 		compiledInstructions := activeScope.instructions
+
+		compiler.symbolTable = localSymbolTable.outer
 		compiler.exitScope()
 
-		compiledFunctionObj := &object.CompiledFunction{Instructions: compiledInstructions}
+		compiledFunctionObj := &object.CompiledFunction{
+			Instructions: compiledInstructions,
+			NumLocals:    localSymbolTable.len(),
+		}
 		compiler.emit(bytecode.OpPush, compiler.addConstant(compiledFunctionObj))
 	case *ast.CallExpression:
 		err := compiler.Compile(n.Function)
@@ -255,7 +269,12 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		if !exists {
 			return fmt.Errorf("unknown identifier %s", n.Value)
 		}
-		compiler.emit(bytecode.OpGetGlobal, symbol.Index)
+		if symbol.Scope == GLOBAL {
+			compiler.emit(bytecode.OpGetGlobal, symbol.Index)
+		} else {
+			compiler.emit(bytecode.OpGetLocal, symbol.Index)
+		}
+
 	case *ast.IntegerLiteral:
 		obj := &object.Integer{Value: n.Value}
 		idx := compiler.addConstant(obj)
