@@ -174,6 +174,10 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		localSymbolTable := NewSymbolTable(compiler.symbolTable)
 		compiler.symbolTable = localSymbolTable
 
+		for _, param := range n.Parameters {
+			compiler.symbolTable.Define(param.Value)
+		}
+
 		err := compiler.Compile(n.Body)
 		if err != nil {
 			return err
@@ -204,7 +208,15 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		if err != nil {
 			return err
 		}
-		compiler.emit(bytecode.OpCall)
+
+		for _, arg := range n.Arguments {
+			err := compiler.Compile(arg)
+			if err != nil {
+				return err
+			}
+		}
+
+		compiler.emit(bytecode.OpCall, len(n.Arguments))
 	case *ast.PrefixExpression:
 		err := compiler.Compile(n.Right)
 		if err != nil {

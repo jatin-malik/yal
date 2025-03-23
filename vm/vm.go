@@ -116,7 +116,7 @@ func (svm *StackVM) Run() error {
 			activeFrame.ip = int(jumpTo)
 		case bytecode.OpSetLocal:
 			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
-			localBindingsStackIdx := svm.frames[svm.activeFrameIdx].bp + int(idx)
+			localBindingsStackIdx := svm.frames[svm.activeFrameIdx].bp + 1 + int(idx)
 			svm.stack[localBindingsStackIdx] = svm.pop()
 			activeFrame.ip += 1 + 2
 		case bytecode.OpSetGlobal:
@@ -125,7 +125,7 @@ func (svm *StackVM) Run() error {
 			activeFrame.ip += 1 + 2
 		case bytecode.OpGetLocal:
 			idx := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
-			localBindingsStackIdx := svm.frames[svm.activeFrameIdx].bp + int(idx)
+			localBindingsStackIdx := svm.frames[svm.activeFrameIdx].bp + 1 + int(idx)
 			obj := svm.stack[localBindingsStackIdx]
 			svm.push(obj)
 			activeFrame.ip += 1 + 2
@@ -157,10 +157,10 @@ func (svm *StackVM) Run() error {
 			svm.push(obj)
 			activeFrame.ip += 1
 		case bytecode.OpCall:
-			// Execute the compiled function sitting on top of the stack
-			compiledFn := svm.pop().(*object.CompiledFunction)
-			activeFrame.ip += 1
-			svm.pushFrame(compiledFn, svm.sp)
+			argsCount := int(activeFrame.instructions[activeFrame.ip+1])
+			compiledFn := svm.stack[svm.sp-1-argsCount].(*object.CompiledFunction)
+			activeFrame.ip += 2
+			svm.pushFrame(compiledFn, svm.sp-1-argsCount)
 			svm.sp += compiledFn.NumLocals
 		case bytecode.OpReturnValue:
 			val := svm.pop()

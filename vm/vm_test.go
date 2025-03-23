@@ -162,6 +162,20 @@ func TestRun(t *testing.T) {
 				let returnsOne = fn() { 1; };
 				returnsOne;};
 				returnsOneReturner()();`, "1"},
+
+		{`let f = fn(x) { x }; f(5)`, "5"},                                 // Single argument
+		{`let f = fn(x, y) { x + y }; f(3, 4)`, "7"},                       // Multiple arguments
+		{`let f = fn(x, y) { x * y }; f(2, 3)`, "6"},                       // Multiplication with arguments
+		{`let f = fn(x) { x * 2 }; f(10)`, "20"},                           // Argument used in expression
+		{`let f = fn(x) { x }; f(1 + 2)`, "3"},                             // Expression as argument
+		{`let f = fn(x, y) { x + y }; f(2 * 3, 4 + 1)`, "11"},              // Mixed expressions as arguments
+		{`let f = fn(x) { x * 2 }; let g = fn(y) { f(y) + 1 }; g(3)`, "7"}, // Function call inside function
+		{`let f = fn(x) {}; f(5)`, "null"},                                 // Function ignoring argument returns null
+		{`let f = fn() { return 42; }; f(5)`, "42"},                        // Extra arguments ignored
+		{`let f = fn(x) { x + 1 }; let g = fn(y) { f(y) * 2 }; g(3)`, "8"}, // Function calling another function with argument
+		{`let add = fn(x, y) { x + y }; let square = fn(n) { n * n }; let h = fn(a, b) { square(add(a, b)) }; h(2, 3)`, "25"}, // Nested function evaluation
+		{`let f = fn(x) { if (x > 10) { return x; } }; f(5)`, "null"},                                                         // Return in condition (false case)
+		{`let f = fn(x) { if (x > 10) { return x; } else { return 0; } }; f(15)`, "15"},                                       // Return in condition (true case)
 	}
 
 	for _, tt := range tests {

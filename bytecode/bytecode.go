@@ -107,7 +107,13 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 		binary.BigEndian.PutUint16(operandBytes[:], uint16(idx))
 		instructions.Write(operandBytes[:])
 	case OpAdd, OpSub, OpMul, OpDiv, OpPushTrue, OpPushFalse, OpEqual, OpNotEqual, OpGT, OpNegateBoolean,
-		OpNegateNumber, OpPushNull, OpIndex, OpCall, OpReturnValue:
+		OpNegateNumber, OpPushNull, OpIndex, OpReturnValue:
+	case OpCall:
+		if len(operands) != 1 {
+			return nil, fmt.Errorf("%s needs one operand", opCode)
+		}
+		argsCount := operands[0]
+		instructions.WriteByte(byte(argsCount))
 	default:
 		return nil, fmt.Errorf("unknown opcode: %d", opCode)
 	}
