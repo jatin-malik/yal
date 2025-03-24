@@ -283,8 +283,10 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		}
 		if symbol.Scope == GLOBAL {
 			compiler.emit(bytecode.OpGetGlobal, symbol.Index)
-		} else {
+		} else if symbol.Scope == LOCAL {
 			compiler.emit(bytecode.OpGetLocal, symbol.Index)
+		} else {
+			compiler.emit(bytecode.OpGetBuiltIn, symbol.Index)
 		}
 
 	case *ast.IntegerLiteral:

@@ -35,6 +35,7 @@ const (
 	OpReturnValue
 	OpSetLocal
 	OpGetLocal
+	OpGetBuiltIn
 )
 
 func (op OpCode) String() string {
@@ -87,6 +88,8 @@ func (op OpCode) String() string {
 		return "OpSetLocal"
 	case OpGetLocal:
 		return "OpGetLocal"
+	case OpGetBuiltIn:
+		return "OpGetBuiltIn"
 	default:
 		return fmt.Sprintf("OpCode(%d)", op)
 	}
@@ -108,7 +111,7 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 		instructions.Write(operandBytes[:])
 	case OpAdd, OpSub, OpMul, OpDiv, OpPushTrue, OpPushFalse, OpEqual, OpNotEqual, OpGT, OpNegateBoolean,
 		OpNegateNumber, OpPushNull, OpIndex, OpReturnValue:
-	case OpCall:
+	case OpCall, OpGetBuiltIn:
 		if len(operands) != 1 {
 			return nil, fmt.Errorf("%s needs one operand", opCode)
 		}

@@ -18,7 +18,7 @@ func (builtin *BuiltinFunction) Inspect() string {
 	return "builtin function"
 }
 
-var builtinFunctions = map[string]*BuiltinFunction{
+var BuiltinFunctions = map[string]*BuiltinFunction{
 	"len":   {builtinLen},
 	"first": {builtinFirst},
 	"last":  {builtinLast},

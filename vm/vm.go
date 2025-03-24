@@ -2,6 +2,7 @@ package vm
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/jatin-malik/yal/bytecode"
 	"github.com/jatin-malik/yal/object"
@@ -12,6 +13,15 @@ const (
 	GlobalsSize int = 65536
 	FramesSize  int = 1024
 )
+
+var builtInFunctions = []*object.BuiltinFunction{
+	object.BuiltinFunctions["len"],
+	object.BuiltinFunctions["first"],
+	object.BuiltinFunctions["last"],
+	object.BuiltinFunctions["rest"],
+	object.BuiltinFunctions["push"],
+	object.BuiltinFunctions["puts"],
+}
 
 // VM mimics a real machine. It emulates the fetch-decode-execute cycle of a real machine and operates upon bytecode.
 type VM interface {
@@ -134,6 +144,11 @@ func (svm *StackVM) Run() error {
 			obj := svm.globals[idx]
 			svm.push(obj)
 			activeFrame.ip += 1 + 2
+		case bytecode.OpGetBuiltIn:
+			idx := int(activeFrame.instructions[activeFrame.ip+1])
+			obj := builtInFunctions[idx]
+			svm.push(obj)
+			activeFrame.ip += 2
 		case bytecode.OpArray:
 			count := binary.BigEndian.Uint16(activeFrame.instructions[activeFrame.ip+1:])
 			arr := svm.buildArray(int(count))
@@ -158,10 +173,25 @@ func (svm *StackVM) Run() error {
 			activeFrame.ip += 1
 		case bytecode.OpCall:
 			argsCount := int(activeFrame.instructions[activeFrame.ip+1])
-			compiledFn := svm.stack[svm.sp-1-argsCount].(*object.CompiledFunction)
+			fn := svm.stack[svm.sp-1-argsCount]
+			if compiledFn, ok := fn.(*object.CompiledFunction); ok {
+				svm.pushFrame(compiledFn, svm.sp-1-argsCount)
+				svm.sp += compiledFn.NumLocals
+			} else if builtInFn, ok := fn.(*object.BuiltinFunction); ok {
+				args := make([]object.Object, argsCount)
+				for i := 0; i < argsCount; i++ {
+					args[argsCount-1-i] = svm.pop()
+				}
+				svm.pop() // pops function from stack
+				obj := builtInFn.Fn(args...)
+				if object.IsErrorValue(obj) {
+					return errors.New(obj.(*object.Error).Message)
+				}
+				svm.push(obj)
+			} else {
+				return fmt.Errorf("not a callable object")
+			}
 			activeFrame.ip += 2
-			svm.pushFrame(compiledFn, svm.sp-1-argsCount)
-			svm.sp += compiledFn.NumLocals
 		case bytecode.OpReturnValue:
 			val := svm.pop()
 			svm.sp = svm.frames[svm.activeFrameIdx].bp // clean up activation record

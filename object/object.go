@@ -268,7 +268,7 @@ func (env *Environment) Get(name string) Object {
 	} else {
 		if env.outer != nil {
 			return env.outer.Get(name)
-		} else if fn, ok := builtinFunctions[name]; ok {
+		} else if fn, ok := BuiltinFunctions[name]; ok {
 			return fn
 		} else {
 			msg := fmt.Sprintf("Undefined variable %q", name)
