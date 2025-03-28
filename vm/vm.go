@@ -341,6 +341,9 @@ func (svm *StackVM) executeDivBinaryOperation(left, right object.Object) error {
 	case object.IntegerObject:
 		l := left.(*object.Integer)
 		r := right.(*object.Integer)
+		if r.Value == 0 {
+			return fmt.Errorf("division by zero")
+		}
 		svm.push(&object.Integer{Value: l.Value / r.Value})
 	default:
 		return fmt.Errorf("unsupported operand type %s with '/'", left.Type())

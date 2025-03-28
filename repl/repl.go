@@ -15,13 +15,17 @@ import (
 	"github.com/jatin-malik/yal/lexer"
 )
 
-func Start(in io.Reader, out io.Writer) {
+func Start(in io.Reader, out io.Writer, engine string) {
+
 	prompt := ">> "
 	scanner := bufio.NewScanner(in)
 	macroEnv := object.NewEnvironment(nil) // shared scope across all macro expansions
-	//env := object.NewEnvironment(nil)      // shared scope across all REPL statements evaluation
+
+	env := object.NewEnvironment(nil) // shared scope across all REPL statements evaluation
+
 	symTable := compiler.NewSymbolTable(nil)
 	globals := make([]object.Object, 100)
+
 	for {
 		_, _ = io.WriteString(out, prompt)
 		// Read
@@ -37,7 +41,6 @@ func Start(in io.Reader, out io.Writer) {
 			return
 		}
 
-		// Eval
 		l := lexer.New(input)
 		p := parser.New(l)
 		prg := p.ParseProgram()
@@ -54,23 +57,27 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		//obj := evaluator.Eval(expandedAST, env)
+		var obj object.Object
+		if engine == "eval" {
+			obj = evaluator.Eval(expandedAST, env)
+		} else if engine == "vm" {
+			compiler := compiler.New(compiler.WithSymbolTable(symTable))
+			err = compiler.Compile(expandedAST)
+			if err != nil {
+				_, _ = io.WriteString(out, err.Error()+"\n")
+				continue
+			}
 
-		compiler := compiler.New(compiler.WithSymbolTable(symTable))
-		err = compiler.Compile(expandedAST)
-		if err != nil {
-			_, _ = io.WriteString(out, err.Error()+"\n")
-			continue
+			bytecode := compiler.Output()
+			vm := vm.NewStackVM(bytecode.Instructions, bytecode.ConstantPool, vm.WithGlobals(globals))
+			err = vm.Run()
+			if err != nil {
+				_, _ = io.WriteString(out, err.Error()+"\n")
+				continue
+			}
+			obj = vm.Top()
 		}
 
-		bytecode := compiler.Output()
-		vm := vm.NewStackVM(bytecode.Instructions, bytecode.ConstantPool, vm.WithGlobals(globals))
-		err = vm.Run()
-		if err != nil {
-			_, _ = io.WriteString(out, err.Error()+"\n")
-			continue
-		}
-		obj := vm.Top()
 		if obj != nil {
 			_, _ = io.WriteString(out, obj.Inspect())
 			_, _ = io.WriteString(out, "\n")

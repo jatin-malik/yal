@@ -114,6 +114,6 @@ var (
 			fmt.Print(arg.Inspect())
 		}
 		fmt.Println()
-		return nil
+		return NULL
 	}
 )

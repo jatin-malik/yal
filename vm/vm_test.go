@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/jatin-malik/yal/bytecode"
+	"github.com/jatin-malik/yal/evaluator"
 	"strings"
 	"testing"
 
@@ -526,8 +527,9 @@ func runTests(t *testing.T, tests []struct {
 			if err != nil {
 				// Check if an error was expected.
 				if strings.HasPrefix(tt.expected, "error:") {
-					if err.Error() != strings.TrimPrefix(tt.expected, "error: ") {
-						t.Errorf("Expected error %s, got %s", tt.expected, err.Error())
+					expectedErrorMsg := strings.TrimPrefix(tt.expected, "error: ")
+					if err.Error() != expectedErrorMsg {
+						t.Errorf("Expected error: %s, got: %s", expectedErrorMsg, err.Error())
 					}
 					return
 				}
@@ -685,6 +687,17 @@ func TestEvalBuiltInFuncRest(t *testing.T) {
 	runTests(t, tests)
 }
 
+func TestEvalBuiltInFuncPuts(t *testing.T) {
+	tests := []struct {
+		input, expected string
+	}{
+		{`puts("hello world")`, "null"},
+		{`puts(if (true){ 10 } else { 20 })`, ""},
+	}
+
+	runTests(t, tests)
+}
+
 func TestEvalBuiltInFuncPush(t *testing.T) {
 	tests := []struct {
 		input, expected string
@@ -743,15 +756,124 @@ func TestRecursiveFibonacci(t *testing.T) {
 	runTests(t, tests)
 }
 
+func TestMacros(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+
+		// 1. Basic arithmetic macro evaluation
+		{`
+			let minus = macro(a, b) { quote(unquote(a) - unquote(b)) };
+			minus(10, 2)`,
+			"8",
+		},
+		{`
+			let add = macro(a, b) { quote(unquote(a) + unquote(b)) };
+			add(3, 7)`,
+			"10",
+		},
+		{`
+			let mul = macro(a, b) { quote(unquote(a) * unquote(b)) };
+			mul(4, 5)`,
+			"20",
+		},
+		{`
+			let div = macro(a, b) { quote(unquote(a) / unquote(b)) };
+			div(10, 2)`,
+			"5",
+		},
+
+		// 2. Macro with variable substitution
+		{`
+			let x = 10;
+			let y = 5;
+			let sub = macro(a, b) { quote(unquote(a) - unquote(b)) };
+			sub(x, y)`,
+			"5",
+		},
+
+		// 4. Macros inside conditionals
+		{`
+			let conditional = macro(a, b) { quote(if (unquote(a) > 0) {unquote(a)} else {unquote(b)}) };
+			conditional(5, 10)`,
+			"5",
+		},
+		{`
+			let conditional = macro(a, b) { quote(if (unquote(a) > 0) {unquote(a)} else {unquote(b)}) };
+			conditional(-5, 10)`,
+			"10",
+		},
+
+		// 5. Macros with functions
+		{`
+			let makeAdder = macro(x) { quote(fn(y) { unquote(x) + y }) };
+			let addFive = makeAdder(5);
+			addFive(3)`,
+			"8",
+		},
+
+		{`
+		let unless = macro(condition, consequence, alternative){
+			quote(if (!(unquote(condition))) { unquote(consequence); }
+			else { unquote(alternative); }); };
+		unless(10 > 5, 2, 3);`,
+			"3"},
+
+		// 6. Edge Cases
+
+		// 6.1 Unused parameter
+		{`
+			let ignoreArg = macro(x) { quote(100) };
+			ignoreArg(50)`,
+			"100",
+		},
+
+		// 6.3 Macro with boolean expressions
+		{`
+			let boolCheck = macro(a) { quote(unquote(a) == true) };
+			boolCheck(true)`,
+			"true",
+		},
+		{`
+			let boolCheck = macro(a) { quote(unquote(a) == false) };
+			boolCheck(true)`,
+			"false",
+		},
+
+		// 6.4 Error case: Division by zero inside macro
+		{`
+			let divZero = macro(a) { quote(unquote(a) / 0) };
+			divZero(10)`,
+			"error: division by zero",
+		},
+
+		// 6.5 Error case: Invalid macro argument
+		{`
+			let invalid = macro(a) { quote(unquote(a) + 1) };
+			invalid("hello")`,
+			"error: incompatible types: STRING and INTEGER",
+		},
+	}
+
+	runTests(t, tests)
+}
+
 // Helper functions
 
 func testCompile(input string) (*compiler.Compiler, error) {
 	lex := lexer.New(input)
 	parser := parser.New(lex)
 	program := parser.ParseProgram()
+	env := object.NewEnvironment(nil)
+	expandedPrg, _ := evaluator.ExpandMacro(program, env)
+
+	if DEBUG {
+		fmt.Println("After macro expansion: ", expandedPrg)
+	}
 
 	compiler := compiler.New()
-	if err := compiler.Compile(program); err != nil {
+	if err := compiler.Compile(expandedPrg); err != nil {
 		return nil, err
 	}
 	return compiler, nil

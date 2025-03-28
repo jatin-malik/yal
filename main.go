@@ -1,40 +1,51 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"github.com/jatin-malik/yal/interpreter"
+	"github.com/jatin-malik/yal/processor"
 	"github.com/jatin-malik/yal/repl"
 	"os"
 	"os/user"
 )
 
+var engine = flag.String("engine", "vm", "engine to use ( vm or eval )")
+
 func main() {
-	if len(os.Args) > 1 {
-		// If there's a filename argument, interpret the whole file
-		filename := os.Args[1]
-		interpretFile(filename)
+	flag.Parse()
+
+	if *engine != "vm" && *engine != "eval" {
+		fmt.Fprintf(os.Stderr, "Usage: %s [-engine vm|eval]", os.Args[0])
+		os.Exit(1)
+	}
+
+	args := flag.Args()
+	if len(args) > 0 {
+		filename := args[0]
+		processFile(filename, *engine)
 	} else {
-		// Otherwise, start the REPL
-		startREPL()
+		startREPL(*engine)
 	}
 }
 
-// startREPL starts the REPL for the yal language
-func startREPL() {
+// startREPL starts the REPL for the language with the provided engine mode
+func startREPL(engine string) {
 	// Get the current user
 	currentUser, err := user.Current()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Hello %s. Welcome to the yal language REPL.\n", currentUser.Username)
+	fmt.Printf("Hello %s. Welcome to the yal language REPL. Executing in %s mode\n",
+		currentUser.Username, engine)
 	fmt.Printf("To quit the REPL, say bye.\n")
 
 	// Start the REPL
-	repl.Start(os.Stdin, os.Stdout)
+	repl.Start(os.Stdin, os.Stdout, engine)
 }
 
-// interpretFile reads the file and interprets it
-func interpretFile(filename string) {
+// processFile reads the file and processes it with the provided engine mode
+func processFile(filename string, engine string) {
+	fmt.Printf("[Processing in %s mode]\n", engine)
 	// Read the file contents
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -42,5 +53,5 @@ func interpretFile(filename string) {
 		return
 	}
 
-	interpreter.Interpret(string(data))
+	processor.Process(string(data), engine)
 }

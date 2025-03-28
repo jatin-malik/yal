@@ -31,6 +31,11 @@ var benchmarkInput = `
 func main() {
 	flag.Parse()
 
+	if *engine == "" {
+		flag.Usage()
+		return
+	}
+
 	var duration time.Duration
 
 	lexer := lexer.New(benchmarkInput)
@@ -54,6 +59,9 @@ func main() {
 		vm.Run()
 		duration = time.Since(start)
 		fmt.Println(vm.Top().Inspect())
+	} else {
+		fmt.Println("Unknown engine")
+		return
 	}
 
 	fmt.Printf("Execution took %d ms.\n", duration.Milliseconds())
