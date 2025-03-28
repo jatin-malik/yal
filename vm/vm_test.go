@@ -1,6 +1,9 @@
 package vm
 
 import (
+	"encoding/binary"
+	"fmt"
+	"github.com/jatin-malik/yal/bytecode"
 	"strings"
 	"testing"
 
@@ -9,6 +12,8 @@ import (
 	"github.com/jatin-malik/yal/object"
 	"github.com/jatin-malik/yal/parser"
 )
+
+var DEBUG = false // TODO: Control this via configuration
 
 // Arithmetic and Nested Expressions
 func TestArithmeticExpressions(t *testing.T) {
@@ -214,6 +219,7 @@ func TestLocalVariableScoping(t *testing.T) {
 	tests := []struct {
 		input, expected string
 	}{
+
 		// Basic local variable usage
 		{`let f = fn() { let x = 5; x }; f()`, "5"},
 		{`let f = fn() { let x = 5; let x = 10; x }; f()`, "10"},
@@ -227,6 +233,7 @@ func TestLocalVariableScoping(t *testing.T) {
 		// Shadowing global variables
 		{`let x = 100; let f = fn() { let x = 5; x }; f()`, "5"},
 		{`let x = 100; let f = fn() { let x = 5; x }; f(); x`, "100"},
+
 		{`let x = 100; let f = fn() { let x = x + 5; x }; f()`, "105"},
 		{`let x = 100; let f = fn() { x + 5 }; f()`, "105"},
 		{`let x = 50; let f = fn() { let x = x + 10; x }; f()`, "60"},
@@ -269,13 +276,253 @@ func TestFunctionArguments(t *testing.T) {
 	runTests(t, tests)
 }
 
+func TestClosures(t *testing.T) {
+	tests := []struct {
+		input, expected string
+	}{
+
+		// Simple closure capturing a variable
+		{`let adder = fn(x) { fn(y) { x + y } }; let addTwo = adder(2); addTwo(3)`, "5"},
+
+		// Nested closures capturing outer variables
+		{`let outer = fn(x) { fn(y) { fn(z) { x + y + z } } }; let mid = outer(1); let inner = mid(2); inner(3)`, "6"},
+
+		// Multiple closures capturing the same outer variable
+		{`let makePair = fn(x) { fn() { x } }; let a = makePair(10); let b = makePair(20); a()`, "10"},
+		{`let makePair = fn(x) { fn() { x } }; let a = makePair(10); let b = makePair(20); b()`, "20"},
+
+		// Closure capturing a function argument
+		{`let apply = fn(f, x) { f(x) }; let mulTwo = fn(x) { x * 2 }; apply(mulTwo, 5)`, "10"},
+
+		// Closure that returns another function
+		{`let makeIncrementer = fn(x) { fn(y) { x + y } }; let incFive = makeIncrementer(5); incFive(10)`, "15"},
+
+		// Closure capturing an outer function return value
+		{`let outer = fn(x) { let y = x + 2; fn() { y * 2 } }; let f = outer(3); f()`, "10"},
+
+		// Closure as an argument to another function
+		{`let twice = fn(f, x) { f(f(x)) }; let addOne = fn(x) { x + 1 }; twice(addOne, 5)`, "7"},
+
+		// Closure with different function scopes
+		{`let a = 10; let outer = fn() { let b = 20; fn() { a + b } }; let f = outer(); f()`, "30"},
+
+		// Closure that captures a local variable but doesn't modify it
+		{`let outer = fn(x) { let y = x * 2; fn() { y } }; let f = outer(4); f()`, "8"},
+
+		{
+			`
+			let newAdderOuter = fn(a, b) {
+				let c = a + b;
+				fn(d) {
+					let e = d + c;
+					fn(f) { e + f; };
+				};
+			};
+
+			let newAdderInner = newAdderOuter(1, 2);
+			let adder = newAdderInner(3);
+			adder(8);`,
+
+			"14",
+		},
+
+		{
+			`
+			let a = 1;
+			let newAdderOuter = fn(b) {
+			fn(c) {
+			fn(d) { a + b + c + d };
+			};
+			};
+			let newAdderInner = newAdderOuter(2);
+			let adder = newAdderInner(3);
+			adder(8);
+			`,
+			"14",
+		},
+
+		{
+			`
+			let newClosure = fn(a, b) {
+			let one = fn() { a; };
+			let two = fn() { b; };
+			fn() { one() + two(); };
+			};
+			let closure = newClosure(9, 90);
+			closure();
+			`,
+			"99",
+		},
+	}
+
+	runTests(t, tests)
+}
+
+func TestNestedLocalBindings(t *testing.T) {
+	tests := []struct {
+		input, expected string
+	}{
+		// Simple nested let bindings
+		{`let f = fn() { let a = 5; let b = 10; a + b }; f()`, "15"},
+
+		// Nested let bindings inside a function
+		{`let f = fn() { let a = 2; let g = fn() { let b = 3; a * b }; g() }; f()`, "6"},
+
+		// Nested bindings within multiple function calls
+		{`let f = fn(x) { let a = x * 2; let g = fn(y) { let b = y + 3; a + b }; g(4) }; f(5)`, "17"},
+
+		// Deeply nested let bindings
+		{`let f = fn() { 
+			let a = 2; 
+			let g = fn() { 
+				let b = 3; 
+				let h = fn() { 
+					let c = 4; 
+					a + b + c 
+				}; 
+				h() 
+			}; 
+			g() 
+		  }; 
+		  f()`, "9"},
+
+		// Shadowing outer variables
+		{`let f = fn() { let x = 10; let g = fn() { let x = 20; x }; g() }; f()`, "20"},
+
+		// Shadowing but accessing outer variables
+		{`let f = fn() { let x = 10; let g = fn() { let x = 20; let h = fn() { x }; h() }; g() }; f()`, "20"},
+
+		// Nested let bindings with return statements
+		{`let f = fn() { 
+			let a = 2; 
+			let g = fn() { 
+				let b = 3; 
+				let h = fn() { 
+					let c = 4; 
+					return a + b + c; 
+				}; 
+				h() 
+			}; 
+			return g(); 
+		  }; 
+		  f()`, "9"},
+
+		// Variables defined inside conditionals inside functions
+		{`let f = fn(x) { 
+			if (x > 10) { 
+				let y = x * 2; 
+				y 
+			} else { 
+				let y = x + 5; 
+				y 
+			} 
+		  }; 
+		  f(15)`, "30"},
+
+		// Function inside a function using nested bindings
+		{`let outer = fn(x) { 
+			let y = x + 1; 
+			let inner = fn() { let z = y * 2; z }; 
+			inner() 
+		  }; 
+		  outer(3)`, "8"},
+
+		// Function capturing a local variable and returning another function
+		{`let makeAdder = fn(x) { 
+			let y = x + 1; 
+			fn(z) { y + z } 
+		  }; 
+		  let addFive = makeAdder(4); 
+		  addFive(3)`, "8"},
+	}
+
+	runTests(t, tests)
+}
+
+func TestRecursiveClosures(t *testing.T) {
+	tests := []struct {
+		input, expected string
+	}{
+
+		{`
+		let wrapper = fn() {
+			let countDown = fn(x) {
+				if (x == 0) {
+					return 0;
+				} else {
+					countDown(x - 1);
+				}
+			};
+			countDown(1);
+		};
+		wrapper();
+		`,
+			"0"},
+
+		// Basic recursive function
+		{`let factorial = fn(n) { 
+			if (n == 0) { return 1; } 
+			else { return n * factorial(n - 1); } 
+		  }; 
+		  factorial(5)`, "120"},
+
+		// Recursive closure function (capturing itself)
+		{`let makeFactorial = fn() { 
+			fn(f, n) { if (n == 0) { return 1; } else { return n * f(f, n - 1); } } 
+		  }; 
+		  let fact = makeFactorial(); 
+		  fact(fact, 5)`, "120"},
+
+		// Closure inside a recursive function
+		{`let factorial = fn(n) { 
+			let helper = fn(f, x) { 
+				if (x == 0) { return 1; } 
+				else { return x * f(f, x - 1); } 
+			}; 
+			helper(helper, n); 
+		  }; 
+		  factorial(5)`, "120"},
+
+		// Recursive function calling a closure that captures a variable
+		{`let recursiveAdder = fn(x) { 
+			let adder = fn(y) { x + y }; 
+			if (x == 0) { return 0; } 
+			else { return adder(recursiveAdder(x - 1)); } 
+		  }; 
+		  recursiveAdder(5)`, "15"},
+
+		// Nested recursive closures
+		{`let makeRecSum = fn() { 
+			fn(f, x) { 
+				if (x == 0) { return 0; } 
+				else { return x + f(f, x - 1); } 
+			} 
+		  }; 
+		  let sum = makeRecSum(); 
+		  sum(sum, 5)`, "15"},
+
+		// Recursive closure capturing an outer variable
+		{`let start = 2; 
+		  let rec = fn(n) { 
+			let inner = fn(f, x) { 
+				if (x == 0) { return start; } 
+				else { return f(f, x - 1) + 1; } 
+			}; 
+			inner(inner, n); 
+		  }; 
+		  rec(3)`, "5"},
+	}
+
+	runTests(t, tests)
+}
+
 // runTests is a helper that iterates over a list of test cases.
 func runTests(t *testing.T, tests []struct {
 	input, expected string
 }) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			obj, err := testVM(tt.input)
+			obj, err := testVM(tt.input, DEBUG)
 			if err != nil {
 				// Check if an error was expected.
 				if strings.HasPrefix(tt.expected, "error:") {
@@ -472,6 +719,30 @@ func TestEvalBuiltInFuncPush(t *testing.T) {
 	runTests(t, tests)
 }
 
+func TestRecursiveFibonacci(t *testing.T) {
+	tests := []struct {
+		input, expected string
+	}{
+		{`
+		let fibonacci = fn(x) {
+			if (x == 0) {
+				return 0;
+			} else {
+				if (x == 1) {
+					return 1;
+				} else {
+					fibonacci(x - 1) + fibonacci(x - 2);
+				}
+			}
+		};
+		fibonacci(15);
+`,
+			"610",
+		},
+	}
+	runTests(t, tests)
+}
+
 // Helper functions
 
 func testCompile(input string) (*compiler.Compiler, error) {
@@ -486,15 +757,106 @@ func testCompile(input string) (*compiler.Compiler, error) {
 	return compiler, nil
 }
 
-func testVM(input string) (object.Object, error) {
+func testVM(input string, debug bool) (object.Object, error) {
 	compiler, err := testCompile(input)
 	if err != nil {
 		return nil, err
 	}
-	bytecode := compiler.Output()
-	vm := NewStackVM(bytecode.Instructions, bytecode.ConstantPool)
+	code := compiler.Output()
+
+	if debug {
+		fmt.Printf("Input - %s\n", input)
+		fmt.Printf("Constant Pool - ")
+		for _, obj := range code.ConstantPool {
+			objType := obj.Type()
+			if objType == object.CompiledFunctionObject {
+				fmt.Println("Compiled Function -")
+				prettyPrintInstructions(obj.(*object.CompiledFunction).Instructions)
+			} else {
+				fmt.Printf("%s:%v, ", objType, obj)
+			}
+		}
+		fmt.Println()
+		prettyPrintInstructions(code.Instructions)
+	}
+
+	vm := NewStackVM(code.Instructions, code.ConstantPool)
 	if err := vm.Run(); err != nil {
 		return nil, err
 	}
 	return vm.Top(), nil
+}
+
+func prettyPrintInstructions(instructions bytecode.Instructions) {
+	fmt.Println("==Instructions===")
+	for i := 0; i < len(instructions); {
+		opCode := bytecode.OpCode(instructions[i])
+		fmt.Print(opCode.String() + " ")
+
+		switch opCode {
+		case bytecode.OpPush:
+			idx := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(idx)
+			i += 1 + 2
+		case bytecode.OpPushTrue, bytecode.OpPushFalse, bytecode.OpPushNull, bytecode.OpAdd, bytecode.OpSub,
+			bytecode.OpMul, bytecode.OpDiv, bytecode.OpEqual, bytecode.OpNotEqual, bytecode.OpGT,
+			bytecode.OpNegateBoolean, bytecode.OpNegateNumber, bytecode.OpIndex, bytecode.OpReturnValue,
+			bytecode.OpGetCurrentClosure:
+			i++
+			fmt.Println()
+		case bytecode.OpJumpIfFalse:
+			jumpTo := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(jumpTo)
+			i += 1 + 2
+		case bytecode.OpJump:
+			jumpTo := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(jumpTo)
+			i += 1 + 2
+		case bytecode.OpSetLocal:
+			idx := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(idx)
+			i += 1 + 2
+		case bytecode.OpSetGlobal:
+			idx := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(idx)
+			i += 1 + 2
+		case bytecode.OpGetLocal:
+			idx := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(idx)
+			i += 1 + 2
+		case bytecode.OpGetGlobal:
+			idx := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(idx)
+			i += 1 + 2
+		case bytecode.OpGetBuiltIn:
+			idx := int(instructions[i+1])
+			fmt.Println(idx)
+			i += 1 + 1
+		case bytecode.OpGetFree:
+			idx := int(instructions[i+1])
+			fmt.Println(idx)
+			i += 1 + 1
+		case bytecode.OpArray:
+			count := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(count)
+			i += 1 + 2
+		case bytecode.OpHash:
+			count := binary.BigEndian.Uint16(instructions[i+1:])
+			fmt.Println(count)
+			i += 1 + 2
+		case bytecode.OpClosure:
+			idx := binary.BigEndian.Uint16(instructions[i+1:])
+			freeCount := int(instructions[i+3])
+			fmt.Println(idx, " ", freeCount)
+			i += 1 + 2 + 1
+		case bytecode.OpCall:
+			argsCount := int(instructions[i+1])
+			fmt.Println(argsCount)
+			i += 2
+		default:
+			fmt.Printf("unknown opcode: %d\n", opCode)
+		}
+
+	}
+	fmt.Println("=========")
 }

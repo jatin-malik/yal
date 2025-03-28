@@ -18,6 +18,7 @@ const (
 	ErrorValueObject       ObjectType = "ERROR"
 	FunctionObject         ObjectType = "FUNCTION"
 	CompiledFunctionObject ObjectType = "COMPILED_FUNCTION"
+	ClosureObject          ObjectType = "CLOSURE"
 	MacroObject            ObjectType = "MACRO"
 	StringObject           ObjectType = "STRING"
 	ArrayObject            ObjectType = "ARRAY"
@@ -166,6 +167,19 @@ func (compiledFunction *CompiledFunction) Type() ObjectType {
 
 func (compiledFunction *CompiledFunction) Inspect() string {
 	return fmt.Sprintf("COMPILED_FUNCTION(%p)", compiledFunction)
+}
+
+type Closure struct {
+	Fn        *CompiledFunction
+	FreeStore []Object
+}
+
+func (closure *Closure) Type() ObjectType {
+	return ClosureObject
+}
+
+func (closure *Closure) Inspect() string {
+	return fmt.Sprintf("Closure(%p)", closure)
 }
 
 type Function struct {

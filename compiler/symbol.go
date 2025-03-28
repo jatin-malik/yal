@@ -3,9 +3,11 @@ package compiler
 type SymbolScope string
 
 const (
-	GLOBAL  SymbolScope = "global"
-	LOCAL   SymbolScope = "local"
-	BUILTIN SymbolScope = "builtin"
+	GLOBAL   SymbolScope = "global"
+	LOCAL    SymbolScope = "local"
+	BUILTIN  SymbolScope = "builtin"
+	FREE     SymbolScope = "free"
+	FUNCTION SymbolScope = "function"
 )
 
 type Symbol struct {
@@ -15,8 +17,9 @@ type Symbol struct {
 }
 
 type SymbolTable struct {
-	store map[string]Symbol
-	outer *SymbolTable
+	store       map[string]Symbol
+	outer       *SymbolTable
+	freeSymbols []Symbol
 }
 
 var builtInSymbols = map[string]Symbol{
@@ -71,12 +74,30 @@ func (table *SymbolTable) Define(identifier string) Symbol {
 	return symbol
 }
 
+func (table *SymbolTable) DefineFunctionSymbol(name string) Symbol {
+	symbol := Symbol{Name: name, Index: len(table.store), Scope: FUNCTION}
+	table.store[name] = symbol
+	return symbol
+}
+
+func (table *SymbolTable) defineFree(symbol Symbol) Symbol {
+	table.freeSymbols = append(table.freeSymbols, symbol)
+	freeSymbol := Symbol{Name: symbol.Name, Index: len(table.freeSymbols) - 1, Scope: FREE}
+	table.store[freeSymbol.Name] = freeSymbol
+	return freeSymbol
+}
+
 func (table *SymbolTable) Lookup(identifier string) (Symbol, bool) {
 	if symbol, ok := table.store[identifier]; ok {
 		return symbol, true
 	}
 	if table.outer != nil {
-		return table.outer.Lookup(identifier)
+		symbol, ok := table.outer.Lookup(identifier)
+		if symbol.Scope == LOCAL || symbol.Scope == FREE {
+			// this is a free variable
+			return table.defineFree(symbol), ok
+		}
+		return symbol, ok
 	}
 
 	if symbol, exists := builtInSymbols[identifier]; exists {

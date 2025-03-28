@@ -77,17 +77,26 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 			}
 		}
 	case *ast.LetStatement:
-		err := compiler.Compile(n.Right)
-		if err != nil {
-			return err
+		var symbol Symbol
+		if fl, ok := n.Right.(*ast.FunctionLiteral); ok {
+			// Register function name first to allow recursive functions
+			symbol = compiler.symbolTable.Define(n.Name.Value)
+
+			fl.Name = n.Name.Value // assign function literal its name
+
+			err := compiler.Compile(fl)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := compiler.Compile(n.Right)
+			if err != nil {
+				return err
+			}
+			symbol = compiler.symbolTable.Define(n.Name.Value)
 		}
 
-		symbol := compiler.symbolTable.Define(n.Name.Value)
-		if symbol.Scope == GLOBAL {
-			compiler.emit(bytecode.OpSetGlobal, symbol.Index)
-		} else {
-			compiler.emit(bytecode.OpSetLocal, symbol.Index)
-		}
+		compiler.storeSymbol(symbol)
 
 	case *ast.ReturnStatement:
 		err := compiler.Compile(n.Value)
@@ -172,10 +181,15 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		activeScope := compiler.scopes[compiler.activeScopeIdx]
 
 		localSymbolTable := NewSymbolTable(compiler.symbolTable)
+
 		compiler.symbolTable = localSymbolTable
 
 		for _, param := range n.Parameters {
 			compiler.symbolTable.Define(param.Value)
+		}
+
+		if n.Name != "" {
+			localSymbolTable.DefineFunctionSymbol(n.Name)
 		}
 
 		err := compiler.Compile(n.Body)
@@ -202,7 +216,15 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 			Instructions: compiledInstructions,
 			NumLocals:    localSymbolTable.len(),
 		}
-		compiler.emit(bytecode.OpPush, compiler.addConstant(compiledFunctionObj))
+		idx := compiler.addConstant(compiledFunctionObj)
+
+		// Push free variables on stack
+		for _, symbol := range localSymbolTable.freeSymbols {
+			compiler.loadSymbol(symbol)
+		}
+
+		compiler.emit(bytecode.OpClosure, idx, len(localSymbolTable.freeSymbols))
+
 	case *ast.CallExpression:
 		err := compiler.Compile(n.Function)
 		if err != nil {
@@ -281,13 +303,7 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		if !exists {
 			return fmt.Errorf("unknown identifier %s", n.Value)
 		}
-		if symbol.Scope == GLOBAL {
-			compiler.emit(bytecode.OpGetGlobal, symbol.Index)
-		} else if symbol.Scope == LOCAL {
-			compiler.emit(bytecode.OpGetLocal, symbol.Index)
-		} else {
-			compiler.emit(bytecode.OpGetBuiltIn, symbol.Index)
-		}
+		compiler.loadSymbol(symbol)
 
 	case *ast.IntegerLiteral:
 		obj := &object.Integer{Value: n.Value}
@@ -351,4 +367,27 @@ func (compiler *Compiler) enterScope() {
 func (compiler *Compiler) exitScope() {
 	compiler.scopes = compiler.scopes[:compiler.activeScopeIdx]
 	compiler.activeScopeIdx--
+}
+
+func (compiler *Compiler) loadSymbol(symbol Symbol) {
+	switch symbol.Scope {
+	case GLOBAL:
+		compiler.emit(bytecode.OpGetGlobal, symbol.Index)
+	case LOCAL:
+		compiler.emit(bytecode.OpGetLocal, symbol.Index)
+	case BUILTIN:
+		compiler.emit(bytecode.OpGetBuiltIn, symbol.Index)
+	case FREE:
+		compiler.emit(bytecode.OpGetFree, symbol.Index)
+	case FUNCTION:
+		compiler.emit(bytecode.OpGetCurrentClosure)
+	}
+}
+
+func (compiler *Compiler) storeSymbol(symbol Symbol) {
+	if symbol.Scope == GLOBAL {
+		compiler.emit(bytecode.OpSetGlobal, symbol.Index)
+	} else {
+		compiler.emit(bytecode.OpSetLocal, symbol.Index)
+	}
 }

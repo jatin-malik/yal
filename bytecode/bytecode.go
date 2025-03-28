@@ -36,6 +36,9 @@ const (
 	OpSetLocal
 	OpGetLocal
 	OpGetBuiltIn
+	OpGetFree
+	OpClosure
+	OpGetCurrentClosure
 )
 
 func (op OpCode) String() string {
@@ -90,6 +93,12 @@ func (op OpCode) String() string {
 		return "OpGetLocal"
 	case OpGetBuiltIn:
 		return "OpGetBuiltIn"
+	case OpGetFree:
+		return "OpGetFree"
+	case OpClosure:
+		return "OpClosure"
+	case OpGetCurrentClosure:
+		return "OpGetCurrentClosure"
 	default:
 		return fmt.Sprintf("OpCode(%d)", op)
 	}
@@ -110,13 +119,24 @@ func Make(opCode OpCode, operands ...int) ([]byte, error) {
 		binary.BigEndian.PutUint16(operandBytes[:], uint16(idx))
 		instructions.Write(operandBytes[:])
 	case OpAdd, OpSub, OpMul, OpDiv, OpPushTrue, OpPushFalse, OpEqual, OpNotEqual, OpGT, OpNegateBoolean,
-		OpNegateNumber, OpPushNull, OpIndex, OpReturnValue:
-	case OpCall, OpGetBuiltIn:
+		OpNegateNumber, OpPushNull, OpIndex, OpReturnValue, OpGetCurrentClosure:
+	case OpCall, OpGetBuiltIn, OpGetFree:
 		if len(operands) != 1 {
 			return nil, fmt.Errorf("%s needs one operand", opCode)
 		}
 		argsCount := operands[0]
 		instructions.WriteByte(byte(argsCount))
+	case OpClosure:
+		if len(operands) != 2 {
+			return nil, fmt.Errorf("%s needs one operand", opCode)
+		}
+		idx := operands[0]
+		var operandBytes [2]byte
+		binary.BigEndian.PutUint16(operandBytes[:], uint16(idx))
+		instructions.Write(operandBytes[:])
+
+		freeCount := operands[1]
+		instructions.WriteByte(byte(freeCount))
 	default:
 		return nil, fmt.Errorf("unknown opcode: %d", opCode)
 	}
