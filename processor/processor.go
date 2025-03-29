@@ -28,8 +28,6 @@ func Process(input string, engine string) {
 		return
 	}
 
-	fmt.Println("Post macro expansion: ", expandedAST.String())
-
 	var obj object.Object
 	if engine == "eval" {
 		env := object.NewEnvironment(nil)

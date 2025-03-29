@@ -124,7 +124,7 @@ func (svm *StackVM) Run() error {
 			activeFrame.ip += 1
 		case bytecode.OpJumpIfFalse:
 			jumpTo := binary.BigEndian.Uint16(activeFrame.instructions()[activeFrame.ip+1:])
-			if !object.IsTruthy(svm.Top()) {
+			if !object.IsTruthy(svm.pop()) {
 				activeFrame.ip = int(jumpTo)
 			} else {
 				activeFrame.ip += 1 + 2

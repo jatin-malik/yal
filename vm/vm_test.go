@@ -687,12 +687,13 @@ func TestEvalBuiltInFuncRest(t *testing.T) {
 	runTests(t, tests)
 }
 
-func TestEvalBuiltInFuncPuts(t *testing.T) {
+func TestTrickyCases(t *testing.T) {
 	tests := []struct {
 		input, expected string
 	}{
-		{`puts("hello world")`, "null"},
-		{`puts(if (true){ 10 } else { 20 })`, ""},
+		{`let add = fn(x,y){x+y};
+				add(if (true){ 10 } else { 20 }, if (true){ 1 } else { 2 } )`,
+			"11"},
 	}
 
 	runTests(t, tests)
