@@ -22,7 +22,3 @@ go.work.sum
 
 # env file
 .env
-
-# Work tracker
-TODO
-testPrograms/*
