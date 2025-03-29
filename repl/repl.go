@@ -2,23 +2,26 @@
 package repl
 
 import (
-	"bufio"
+	"github.com/chzyer/readline"
 	"github.com/jatin-malik/yal/compiler"
+	"github.com/jatin-malik/yal/evaluator"
+	"github.com/jatin-malik/yal/lexer"
+	"github.com/jatin-malik/yal/object"
+	"github.com/jatin-malik/yal/parser"
 	"github.com/jatin-malik/yal/vm"
 	"io"
 	"strings"
-
-	"github.com/jatin-malik/yal/evaluator"
-	"github.com/jatin-malik/yal/object"
-	"github.com/jatin-malik/yal/parser"
-
-	"github.com/jatin-malik/yal/lexer"
 )
 
 func Start(in io.Reader, out io.Writer, engine string) {
 
 	prompt := ">> "
-	scanner := bufio.NewScanner(in)
+	rl, err := readline.New(prompt)
+	if err != nil {
+		panic(err)
+	}
+	defer rl.Close()
+
 	macroEnv := object.NewEnvironment(nil) // shared scope across all macro expansions
 
 	env := object.NewEnvironment(nil) // shared scope across all REPL statements evaluation
@@ -27,21 +30,17 @@ func Start(in io.Reader, out io.Writer, engine string) {
 	globals := make([]object.Object, 100)
 
 	for {
-		_, _ = io.WriteString(out, prompt)
-		// Read
-		if !scanner.Scan() {
-			if scanner.Err() != nil {
-				_, _ = io.WriteString(out, "scanning errored out")
-			}
-			return
-		}
-		input := scanner.Text()
 
-		if strings.ToLower(input) == "bye" {
+		line, err := rl.Readline()
+		if err != nil {
+			break
+		}
+
+		if strings.ToLower(line) == "bye" {
 			return
 		}
 
-		l := lexer.New(input)
+		l := lexer.New(line)
 		p := parser.New(l)
 		prg := p.ParseProgram()
 		if len(p.Errors) != 0 {
