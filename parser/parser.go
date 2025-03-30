@@ -269,13 +269,18 @@ func (p *Parser) parseFunctionParams() []*ast.Identifier {
 func (p *Parser) parseCommaSeparatedExpressions(endToken token.TokenType) []ast.Expression {
 	p.Next()
 	var arguments []ast.Expression
-	for p.curToken.Type != endToken {
+	for p.curToken.Type != endToken && p.curToken.Type != token.EOF {
 		arg := p.parseExpression(LowestPrecedence)
 		arguments = append(arguments, arg)
 		p.Next()
 		if p.curToken.Type == token.COMMA {
 			p.Next()
 		}
+	}
+
+	if p.curToken.Type != endToken {
+		p.Errors = append(p.Errors, "incomplete arguments")
+		return nil
 	}
 	return arguments
 }
@@ -398,6 +403,11 @@ func (p *Parser) parseHashLiteral() ast.Expression {
 		if p.curToken.Type == token.COMMA {
 			p.Next()
 		}
+	}
+
+	if p.curToken.Type != token.RBRACE {
+		p.Errors = append(p.Errors, "incomplete hash expression")
+		return nil
 	}
 
 	hl.Pairs = pairs
