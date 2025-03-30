@@ -204,6 +204,11 @@ func (svm *StackVM) Run() error {
 			argsCount := int(activeFrame.instructions()[activeFrame.ip+1])
 			fn := svm.stack[svm.sp-1-argsCount]
 			if closure, ok := fn.(*object.Closure); ok {
+
+				requiredParams := closure.Fn.NumParams
+				if argsCount != requiredParams {
+					return fmt.Errorf("expected %d parameters, got %d args", requiredParams, argsCount)
+				}
 				svm.pushFrame(closure, svm.sp-1-argsCount)
 				svm.sp += closure.Fn.NumLocals
 			} else if builtInFn, ok := fn.(*object.BuiltinFunction); ok {

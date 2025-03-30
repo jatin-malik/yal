@@ -221,6 +221,7 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 		compiledFunctionObj := &object.CompiledFunction{
 			Instructions: compiledInstructions,
 			NumLocals:    localSymbolTable.len(),
+			NumParams:    len(n.Parameters),
 		}
 		idx := compiler.addConstant(compiledFunctionObj)
 

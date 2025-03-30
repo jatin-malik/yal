@@ -266,7 +266,7 @@ func TestFunctionArguments(t *testing.T) {
 		{`let f = fn(x, y) { x + y }; f(2 * 3, 4 + 1)`, "11"},
 		{`let f = fn(x) { x * 2 }; let g = fn(y) { f(y) + 1 }; g(3)`, "7"},
 		{`let f = fn(x) {}; f(5)`, "null"},
-		{`let f = fn() { return 42; }; f(5)`, "42"},
+		{`let f = fn() { return 42; }; f(5)`, "error: expected 0 parameters, got 1 args"},
 		{`let f = fn(x) { x + 1 }; let g = fn(y) { f(y) * 2 }; g(3)`, "8"},
 		{`let add = fn(x, y) { x + y }; let square = fn(n) { n * n };
 		  let h = fn(a, b) { square(add(a, b)) }; h(2, 3)`, "25"},
