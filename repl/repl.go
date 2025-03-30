@@ -2,6 +2,8 @@
 package repl
 
 import (
+	"errors"
+	"fmt"
 	"github.com/chzyer/readline"
 	"github.com/jatin-malik/yal/compiler"
 	"github.com/jatin-malik/yal/evaluator"
@@ -36,7 +38,20 @@ func Start(in io.Reader, out io.Writer, engine string) {
 	for {
 
 		line, err := rl.Readline()
-		if err != nil {
+
+		if errors.Is(err, readline.ErrInterrupt) {
+			// Ctrl+C was pressed: Clear input and continue
+			fmt.Println("KeyboardInterrupt")
+			multilineMode = false
+			rl.SetPrompt(prompt) // restore original prompt
+			continue
+		} else if err == io.EOF {
+			// Handle Ctrl+D (EOF)
+			fmt.Println("See ya.")
+			break
+		} else if err != nil {
+			// Handle unexpected errors
+			fmt.Println("Error:", err)
 			break
 		}
 
