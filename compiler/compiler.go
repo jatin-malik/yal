@@ -40,6 +40,12 @@ func WithSymbolTable(symTable *SymbolTable) Option {
 	}
 }
 
+func WithConstantPool(constantPool []object.Object) Option {
+	return func(c *Compiler) {
+		c.constantPool = constantPool
+	}
+}
+
 func New(options ...Option) *Compiler {
 	var scopes []*CompilationScope
 	scopes = append(scopes, NewCompilationScope())

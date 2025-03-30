@@ -215,9 +215,17 @@ func (p *Parser) parseIfElseConditional() ast.Expression {
 		return nil
 	}
 	p.Next()
-	exp.Condition = p.parseExpression(LowestPrecedence)
-	if !p.expectPeek(token.RPAREN) {
+	if p.curToken.Type == token.RPAREN {
+		// empty condition not allowed
+		p.Errors = append(p.Errors, "empty condition not allowed")
 		return nil
+	}
+	exp.Condition = p.parseExpression(LowestPrecedence)
+	if p.peekToken.Type != token.RPAREN {
+		p.Errors = append(p.Errors, "incomplete condition")
+		return nil
+	} else {
+		p.Next()
 	}
 	p.Next()
 	exp.Consequence = p.parseBlockStatement()
@@ -237,7 +245,7 @@ func (p *Parser) parseFunctionParams() []*ast.Identifier {
 
 	p.Next()
 	var identifiers []*ast.Identifier
-	for p.curToken.Type != token.RPAREN {
+	for p.curToken.Type != token.EOF && p.curToken.Type != token.RPAREN {
 		ident := &ast.Identifier{
 			Token: p.curToken,
 			Value: p.curToken.Literal,
@@ -248,6 +256,12 @@ func (p *Parser) parseFunctionParams() []*ast.Identifier {
 			p.Next()
 		}
 	}
+
+	if p.curToken.Type != token.RPAREN {
+		p.Errors = append(p.Errors, "incomplete arguments")
+		return nil
+	}
+
 	return identifiers
 }
 
@@ -268,6 +282,7 @@ func (p *Parser) parseCommaSeparatedExpressions(endToken token.TokenType) []ast.
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	if p.curToken.Type != token.LBRACE {
+		p.Errors = append(p.Errors, "block statement required")
 		return nil
 	}
 	p.Next()
@@ -285,9 +300,9 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	}
 
 	if p.curToken.Type != token.RBRACE {
+		p.Errors = append(p.Errors, "incomplete block statement")
 		return nil
 	}
-
 	program.Statements = statements
 	return program
 }
@@ -297,11 +312,11 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	if prefixParser, ok := p.prefixParsers[p.curToken.Type]; ok {
 		leftExp = prefixParser()
 	} else {
-		p.Errors = append(p.Errors, fmt.Sprintf("no prefix parsing function registered for %s", p.curToken))
+		p.Errors = append(p.Errors, fmt.Sprintf("no prefix parsing function registered for %s", p.curToken.Type))
 		return leftExp
 	}
 
-	for p.peekToken.Type != token.SEMICOLON && getTokenPrecedence(p.peekToken.Type) > precedence {
+	for p.peekToken.Type != token.SEMICOLON && p.peekToken.Type != token.EOF && getTokenPrecedence(p.peekToken.Type) > precedence {
 		if infixParser, exists := p.infixParsers[p.peekToken.Type]; !exists {
 			return leftExp
 		} else {
@@ -407,7 +422,7 @@ func (p *Parser) expectPeek(tokenType token.TokenType) bool {
 		p.Next()
 		return true
 	} else {
-		errMsg := fmt.Sprintf("expected token %s, got %s", tokenType, p.peekToken)
+		errMsg := fmt.Sprintf("expected token %s, got %s", tokenType, p.peekToken.Type)
 		p.Errors = append(p.Errors, errMsg)
 		return false
 	}

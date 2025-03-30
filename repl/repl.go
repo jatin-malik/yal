@@ -27,7 +27,11 @@ func Start(in io.Reader, out io.Writer, engine string) {
 	env := object.NewEnvironment(nil) // shared scope across all REPL statements evaluation
 
 	symTable := compiler.NewSymbolTable(nil)
+	constantPool := make([]object.Object, 0)
 	globals := make([]object.Object, 100)
+
+	multilineMode := false
+	var buffer []string // Stores multi-line input
 
 	for {
 
@@ -40,7 +44,19 @@ func Start(in io.Reader, out io.Writer, engine string) {
 			return
 		}
 
-		l := lexer.New(line)
+		buffer = append(buffer, line)
+		if isCompleteStatement(line, multilineMode) {
+			multilineMode = false
+			rl.SetPrompt(prompt) // restore original prompt
+		} else {
+			multilineMode = true
+			rl.SetPrompt("..") // Change prompt for multi-line
+			continue
+		}
+
+		input := strings.Join(buffer, "\n")
+		buffer = nil // Reset buffer
+		l := lexer.New(input)
 		p := parser.New(l)
 		prg := p.ParseProgram()
 		if len(p.Errors) != 0 {
@@ -60,7 +76,7 @@ func Start(in io.Reader, out io.Writer, engine string) {
 		if engine == "eval" {
 			obj = evaluator.Eval(expandedAST, env)
 		} else if engine == "vm" {
-			compiler := compiler.New(compiler.WithSymbolTable(symTable))
+			compiler := compiler.New(compiler.WithSymbolTable(symTable), compiler.WithConstantPool(constantPool))
 			err = compiler.Compile(expandedAST)
 			if err != nil {
 				_, _ = io.WriteString(out, err.Error()+"\n")
@@ -68,6 +84,7 @@ func Start(in io.Reader, out io.Writer, engine string) {
 			}
 
 			bytecode := compiler.Output()
+			constantPool = bytecode.ConstantPool // updates shared constant pool
 			vm := vm.NewStackVM(bytecode.Instructions, bytecode.ConstantPool, vm.WithGlobals(globals))
 			err = vm.Run()
 			if err != nil {
@@ -82,4 +99,28 @@ func Start(in io.Reader, out io.Writer, engine string) {
 			_, _ = io.WriteString(out, "\n")
 		}
 	}
+}
+
+func isCompleteStatement(line string, multilineMode bool) bool {
+	if !multilineMode {
+		lex := lexer.New(line)
+		parser := parser.New(lex)
+		parser.ParseProgram()
+		if len(parser.Errors) != 0 {
+			for _, msg := range parser.Errors {
+				if strings.HasPrefix(msg, "incomplete") {
+					return false
+				}
+			}
+		}
+		return true
+	}
+
+	// Inside multiline mode
+	if line == "" { // Exit multiline mode when user presses RET on empty line
+		return true
+	}
+
+	return false
+
 }
