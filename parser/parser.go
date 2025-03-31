@@ -96,6 +96,8 @@ func (p *Parser) parseStatement() *ast.Statement {
 		stmt = p.parseLetStatement()
 	case token.RETURN:
 		stmt = p.parseReturnStatement()
+	case token.LOOP:
+		stmt = p.parseLoopStatement()
 	default:
 		stmt = p.parseExpressionStatement()
 	}
@@ -122,6 +124,32 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	if !p.expectPeek(token.SEMICOLON) {
 		return nil
 	}
+	return stmt
+}
+
+func (p *Parser) parseLoopStatement() *ast.LoopStatement {
+	stmt := &ast.LoopStatement{
+		Token: p.curToken,
+	}
+
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+	p.Next()
+	if p.curToken.Type == token.RPAREN {
+		// empty condition not allowed
+		p.Errors = append(p.Errors, "empty condition not allowed")
+		return nil
+	}
+	stmt.Condition = p.parseExpression(LowestPrecedence)
+	if p.peekToken.Type != token.RPAREN {
+		p.Errors = append(p.Errors, "incomplete condition")
+		return nil
+	} else {
+		p.Next()
+	}
+	p.Next()
+	stmt.Body = p.parseBlockStatement()
 	return stmt
 }
 

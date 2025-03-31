@@ -617,6 +617,140 @@ func TestEvalBuiltInFuncFirst(t *testing.T) {
 	runTests(t, tests)
 }
 
+func TestLooping(t *testing.T) {
+	tests := []struct {
+		input, expected string
+	}{
+		// ✅ Basic Loop: Counting from 0 to 9
+		{
+			`
+		let i = 0;
+		let result = 0;
+		loop (i < 10) {
+			let result = result + 1;
+			let i = i + 1;
+		}
+		result;
+		`,
+			"10",
+		},
+
+		// ✅ Loop with String Concatenation
+		{
+			`
+		let i = 0;
+		let result = "";
+		loop (i < 3) {
+			let result = result + "hi ";
+			let i = i + 1;
+		}
+		result;
+		`,
+			"hi hi hi ",
+		},
+
+		// ✅ Loop with Multiplication
+		{
+			`
+		let i = 1;
+		let result = 1;
+		loop (i < 6) {
+			let result = result * i;
+			let i = i + 1;
+		}
+		result;
+		`,
+			"120", // 1 * 2 * 3 * 4 * 5
+		},
+
+		// ✅ Nested Loops
+		{
+			`
+		let i = 0;
+		let j = 0;
+		let result = 0;
+		loop (i < 3) {
+			let j = 0;
+			loop (j < 2) {
+				let result = result + 1;
+				let j = j + 1;
+			}
+			let i = i + 1;
+		}
+		result;
+		`,
+			"6", // Runs 3 * 2 times
+		},
+
+		// ✅ Loop That Never Runs
+		{
+			`
+		let i = 10;
+		let result = 100;
+		loop (i < 5) {
+			let result = result - 1;
+			let i = i + 1;
+		}
+		result;
+		`,
+			"100", // Condition `i < 5` is false at start
+		},
+
+		// ✅ Loop with Boolean Condition
+		{
+			`
+		let i = 0;
+		let shouldRun = true;
+		let result = 0;
+		loop (shouldRun) {
+			let result = result + 1;
+			if (result == 5) { let shouldRun = false; }
+		}
+		result;
+		`,
+			"5", // Stops when `shouldRun` becomes `false`
+		},
+
+		// ✅ Loop with List Append
+		{
+			`
+		let i = 0;
+		let list = [];
+		loop (i < 3) {
+			let list = push(list,i);
+			let i = i + 1;
+		}
+		list;
+		`,
+			"[0, 1, 2]", // Should store `[0, 1, 2]`
+		},
+
+		// ❌ Loop with Undefined Variable in Condition
+		{
+			`
+		loop (x < 10) {
+			puts("This should not run");
+		}
+		`,
+			"error: unknown identifier x",
+		},
+
+		// ❌ Loop with Undefined Variable Inside Body
+		{
+			`
+		let i = 0;
+		loop (i < 3) {
+			let result = result + 1;
+			let i = i + 1;
+		}
+		`,
+			"error: unknown identifier result",
+		},
+	}
+
+	runTests(t, tests)
+}
+
 func TestEvalBuiltInFuncLast(t *testing.T) {
 	tests := []struct {
 		input, expected string

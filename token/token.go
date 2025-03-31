@@ -37,6 +37,7 @@ const (
 	RETURN   TokenType = "RETURN"
 	TRUE     TokenType = "TRUE"
 	FALSE    TokenType = "FALSE"
+	LOOP     TokenType = "LOOP"
 
 	// Others
 	IDENT   TokenType = "IDENT"
@@ -58,6 +59,7 @@ var keywords = map[string]TokenType{
 	"return": RETURN,
 	"true":   TRUE,
 	"false":  FALSE,
+	"loop":   LOOP,
 }
 
 func GetTokenFromName(name string) TokenType {

@@ -1090,6 +1090,158 @@ func TestEvalBuiltInFuncPush(t *testing.T) {
 	}
 }
 
+func TestLooping(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected interface{}
+	}{
+		// ✅ Basic Loop: Counting from 0 to 9
+		{
+			`
+		let i = 0;
+		let result = 0;
+		loop (i < 10) {
+			let result = result + 1;
+			let i = i + 1;
+		}
+		result;
+		`,
+			10,
+		},
+
+		// ✅ Loop with String Concatenation
+		{
+			`
+		let i = 0;
+		let result = "";
+		loop (i < 3) {
+			let result = result + "hi ";
+			let i = i + 1;
+		}
+		result;
+		`,
+			"hi hi hi ",
+		},
+
+		// ✅ Loop with Multiplication
+		{
+			`
+		let i = 1;
+		let result = 1;
+		loop (i < 6) {
+			let result = result * i;
+			let i = i + 1;
+		}
+		result;
+		`,
+			120, // 1 * 2 * 3 * 4 * 5
+		},
+
+		// ✅ Nested Loops
+		{
+			`
+		let i = 0;
+		let j = 0;
+		let result = 0;
+		loop (i < 3) {
+			let j = 0;
+			loop (j < 2) {
+				let result = result + 1;
+				let j = j + 1;
+			}
+			let i = i + 1;
+		}
+		result;
+		`,
+			6, // Runs 3 * 2 times
+		},
+
+		// ✅ Loop That Never Runs
+		{
+			`
+		let i = 10;
+		let result = 100;
+		loop (i < 5) {
+			let result = result - 1;
+			let i = i + 1;
+		}
+		result;
+		`,
+			100, // Condition `i < 5` is false at start
+		},
+
+		// ✅ Loop with Boolean Condition
+		{
+			`
+		let i = 0;
+		let shouldRun = true;
+		let result = 0;
+		loop (shouldRun) {
+			let result = result + 1;
+			if (result == 5) { let shouldRun = false; }
+		}
+		result;
+		`,
+			5, // Stops when `shouldRun` becomes `false`
+		},
+
+		// ✅ Loop with List Append
+		{
+			`
+		let i = 0;
+		let list = [];
+		loop (i < 3) {
+			let list = push(list,i);
+			let i = i + 1;
+		}
+		list;
+		`,
+			[]interface{}{0, 1, 2}, // Should store `[0, 1, 2]`
+		},
+
+		// ❌ Loop with Undefined Variable in Condition
+		{
+			`
+		loop (x < 10) {
+			puts("This should not run");
+		}
+		`,
+			errors.New(`Undefined variable "x"`),
+		},
+
+		// ❌ Loop with Undefined Variable Inside Body
+		{
+			`
+		let i = 0;
+		loop (i < 3) {
+			let result = result + 1;
+			let i = i + 1;
+		}
+		`,
+			errors.New(`Undefined variable "result"`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			obj := testEval(tt.input)
+
+			switch expected := tt.expected.(type) {
+			case int:
+				testIntegerObject(t, obj, int64(expected))
+			case string:
+				testStringObject(t, obj, expected)
+			case error:
+				testErrorObject(t, obj, expected.Error())
+			case []interface{}:
+				testArrayObject(t, obj, expected)
+			default:
+				t.Errorf("unexpected type %T for expected value: %v", expected, expected)
+			}
+		})
+	}
+}
+
 // TODO: Put these scenarios with their respective normal cases in other test functions.
 func TestEvalErrorHandling(t *testing.T) {
 	tests := []struct {
@@ -1246,6 +1398,8 @@ func testArrayObject(t *testing.T, obj object.Object, expected []interface{}) {
 	// Iterate through the array elements and compare them to the expected values
 	for i, expectedElem := range expected {
 		switch expectedElem := expectedElem.(type) {
+		case int:
+			testIntegerObject(t, arr.Elements[i], int64(expectedElem))
 		case int64:
 			testIntegerObject(t, arr.Elements[i], expectedElem)
 		case string:

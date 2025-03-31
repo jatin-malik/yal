@@ -3,7 +3,7 @@ package ast
 type Modifier func(Node) (Node, error)
 
 // Walker walks the input AST and applies modifier to each node.
-// It returns a AST copy and does not mutate the input AST.
+// It returns an AST copy and does not mutate the input AST.
 func Walker(node Node, modifier Modifier) (Node, error) {
 	if node == nil {
 		return nil, nil
@@ -117,6 +117,19 @@ func Walker(node Node, modifier Modifier) (Node, error) {
 		return modifier(&IfElseConditional{
 			Token:     n.Token,
 			Condition: mCondition.(Expression), Consequence: mConsequence.(*BlockStatement), Alternative: mAlternative})
+
+	case *LoopStatement:
+		mCondition, err := Walker(n.Condition, modifier)
+		if err != nil {
+			return nil, err
+		}
+		mBody, err := Walker(n.Body, modifier)
+		if err != nil {
+			return nil, err
+		}
+		return modifier(&LoopStatement{
+			Token:     n.Token,
+			Condition: mCondition.(Expression), Body: mBody.(*BlockStatement)})
 
 	case *BlockStatement:
 		var newStatements []Statement

@@ -148,6 +148,21 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 				result = object.NULL
 			}
 		}
+	case *ast.LoopStatement:
+		for {
+			result = Eval(v.Condition, env)
+			if object.IsErrorValue(result) {
+				return result
+			}
+			if object.IsTruthy(result) {
+				result = Eval(v.Body, env)
+				if object.IsErrorValue(result) {
+					return result
+				}
+			} else {
+				break
+			}
+		}
 	case *ast.LetStatement:
 		rightObj := Eval(v.Right, env)
 		if object.IsErrorValue(rightObj) {

@@ -63,6 +63,7 @@ func TestLexer(t *testing.T) {
 			"hello world"
 			[100,"hello",true]
 			macro(x)
+			loop(true)
 			# Program ended`
 
 		l := lexer.New(input)
@@ -147,6 +148,10 @@ func TestLexer(t *testing.T) {
 			{token.MACRO, "macro"},
 			{token.LPAREN, "("},
 			{token.IDENT, "x"},
+			{token.RPAREN, ")"},
+			{token.LOOP, "loop"},
+			{token.LPAREN, "("},
+			{token.TRUE, "true"},
 			{token.RPAREN, ")"},
 			{token.EOF, string(byte(0))},
 		}

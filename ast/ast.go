@@ -213,6 +213,30 @@ func (iec IfElseConditional) TokenLiteral() string {
 	return iec.Token.Literal
 }
 
+type LoopStatement struct {
+	Token     token.Token
+	Condition Expression
+	Body      *BlockStatement
+}
+
+func (l LoopStatement) statementBehaviour() {}
+
+func (l LoopStatement) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("for ")
+	buf.WriteString("(")
+	buf.WriteString(l.Condition.String())
+	buf.WriteString(")")
+	buf.WriteString("{")
+	buf.WriteString(l.Body.String())
+	buf.WriteString("}")
+	return buf.String()
+}
+
+func (l LoopStatement) TokenLiteral() string {
+	return l.Token.Literal
+}
+
 type PrefixExpression struct {
 	Token    token.Token
 	Operator string

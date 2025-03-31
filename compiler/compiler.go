@@ -148,7 +148,26 @@ func (compiler *Compiler) Compile(node ast.Node) error {
 
 		newJumpIns, _ := bytecode.Make(bytecode.OpJump, len(activeScope.instructions))
 		compiler.modifyInstruction(jumpOffset, newJumpIns)
+	case *ast.LoopStatement:
+		conditionOffset := len(activeScope.instructions)
+		err := compiler.Compile(n.Condition)
+		if err != nil {
+			return err
+		}
 
+		compiler.emit(bytecode.OpJumpIfFalse, 9999)
+		conditionalJumpOffset := activeScope.lastAddedInsOffset
+
+		err = compiler.Compile(n.Body)
+		if err != nil {
+			return err
+		}
+
+		compiler.emit(bytecode.OpJump, conditionOffset)
+
+		// Back-patch conditional jump
+		newConditionalJumpIns, _ := bytecode.Make(bytecode.OpJumpIfFalse, len(activeScope.instructions))
+		compiler.modifyInstruction(conditionalJumpOffset, newConditionalJumpIns)
 	case *ast.ArrayLiteral:
 		for _, element := range n.Elements {
 			err := compiler.Compile(element)
